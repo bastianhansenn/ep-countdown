@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+html,
+body {
+  background-color: #030308;
+}
+
+@keyframes spin-y {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+.animate-spin-y {
+  animation: spin-y 8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin-y {
+    animation: none;
+  }
+}

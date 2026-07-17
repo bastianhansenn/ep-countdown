@@ -1,0 +1,6 @@
+Billederne er installeret:
+
+  background.jpg  = gadebilledet (nat-graderes automatisk i koden)
+  logo.jpg        = logoet (sort baggrund blendes vaek automatisk)
+
+Vil du udskifte et af dem, saa overskriv filen her og genindlaes siden.
