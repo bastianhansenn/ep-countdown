@@ -189,8 +189,8 @@ const sample = (fx, fy) => {
 // specular blob does not travel with the glaze.
 const softenSpecular = ([r, g, b]) => {
   const mn = Math.min(r, g, b)
-  if (mn > 185) {
-    const c = (v) => Math.round(185 + (v - 185) * 0.3)
+  if (mn > 205) {
+    const c = (v) => Math.round(205 + (v - 205) * 0.4)
     return [c(r), c(g), c(b)]
   }
   return [r, g, b]
@@ -254,7 +254,11 @@ const bodyPixels = unwrap(
   (v) => bottomRow - v * (bottomRow - bodyTopRow),
   (v, fy) => radii[Math.max(bodyTopRow, Math.min(footBottomRow, Math.round(fy)))],
 )
+// Contrast S-push plus unsharp mask so the pattern reads crisply even at
+// small on-screen sizes.
 await sharp(bodyPixels, { raw: { width: BODY_SIZE, height: BODY_SIZE, channels: 3 } })
+  .linear(1.16, -12)
+  .sharpen({ sigma: 1.2, m1: 1.0, m2: 0.6 })
   .png()
   .toFile(OUT_BODY)
 
@@ -267,6 +271,8 @@ const lidPixels = unwrap(
   (v) => profileRadiusAt(LID_PROFILE, v * LID_TOP_Y) * pxPerUnit,
 )
 await sharp(lidPixels, { raw: { width: LID_SIZE, height: LID_SIZE, channels: 3 } })
+  .linear(1.16, -12)
+  .sharpen({ sigma: 1.2, m1: 1.0, m2: 0.6 })
   .png()
   .toFile(OUT_LID)
 

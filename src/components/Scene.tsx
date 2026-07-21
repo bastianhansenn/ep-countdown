@@ -42,15 +42,15 @@ function MuseumDisplay() {
 
   return (
     <group
-      position={isMobile ? [0, -0.39, -3] : [-2.2, 0.33, -3.5]}
-      scale={isMobile ? 0.85 : 1}
+      position={isMobile ? [0, -0.06, -3] : [-2.2, 0.73, -3.5]}
+      scale={isMobile ? 0.95 : 1.12}
     >
       {/* Cool overhead beam, like a night-lit museum piece. */}
       <spotLight
         position={[1.5, 7.5, 3]}
         target={spotTarget}
         color="#d8e4ff"
-        intensity={1.5}
+        intensity={1.8}
         angle={0.42}
         penumbra={0.8}
         decay={0}
@@ -68,7 +68,7 @@ export default function Scene() {
     <Canvas
       camera={{ position: [0, 0, 10], fov: 45 }}
       gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-      dpr={[1, 2]}
+      dpr={2}
     >
       {/* No fog: it would wash out the in-scene photo backdrop, and the
           baked depth-of-field in the image already carries the depth cue. */}

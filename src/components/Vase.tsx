@@ -77,11 +77,11 @@ export default function Vase() {
         <meshPhysicalMaterial
           ref={bodyMat}
           map={texture}
-          roughness={0.15}
+          roughness={0.18}
           metalness={0}
-          clearcoat={1}
-          clearcoatRoughness={0.08}
-          envMapIntensity={1}
+          clearcoat={0.6}
+          clearcoatRoughness={0.1}
+          envMapIntensity={0.7}
           emissive="#1a4aff"
           emissiveIntensity={0.03}
           side={THREE.DoubleSide}
