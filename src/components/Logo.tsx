@@ -22,7 +22,7 @@ export default function Logo() {
             </span>
           ) : (
             <img
-              src="/logo.png"
+              src="./logo.png"
               alt="Artist logo"
               className="h-26 w-auto opacity-70"
               onError={() => setImgFailed(true)}

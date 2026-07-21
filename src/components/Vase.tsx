@@ -17,7 +17,7 @@ export default function Vase() {
   const seamMat = useRef<THREE.MeshBasicMaterial>(null!)
 
   // Cylindrical unwraps of the real vase photo (scripts/make-vase-texture.mjs).
-  const [texture, lidTexture] = useTexture(['/vase-body.png', '/vase-lid.png'])
+  const [texture, lidTexture] = useTexture(['./vase-body.png', './vase-lid.png'])
   useMemo(() => {
     for (const tx of [texture, lidTexture]) {
       tx.colorSpace = THREE.SRGBColorSpace

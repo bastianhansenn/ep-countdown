@@ -11,7 +11,7 @@ export default function Background() {
     <div className="fixed inset-0 z-0 bg-[#030308]">
       {!imgFailed && (
         <img
-          src="/background-night.jpg"
+          src="./background-night.jpg"
           alt=""
           className="h-full w-full object-cover"
           onError={() => setImgFailed(true)}

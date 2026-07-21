@@ -13,7 +13,7 @@ const BACKDROP_Z = -14
 const IMG_ASPECT = 1920 / 1148
 
 function Backdrop() {
-  const texture = useTexture('/background-night.jpg')
+  const texture = useTexture('./background-night.jpg')
   const aspect = useThree((s) => s.viewport.aspect)
   useMemo(() => {
     texture.colorSpace = THREE.SRGBColorSpace
