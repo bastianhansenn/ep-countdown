@@ -27,7 +27,7 @@ export default function App() {
       />
 
       <div className="pointer-events-none absolute inset-0 z-30">
-        <div className="mx-auto flex h-full max-w-7xl flex-col items-center justify-start px-6 pt-24 md:items-end md:justify-center md:pt-0 md:pr-16 lg:pr-24">
+        <div className="mx-auto flex h-full max-w-7xl flex-col items-center justify-end px-6 pb-20 md:items-end md:justify-center md:pb-0 md:pr-16 lg:pr-24">
           <div className="flex flex-col items-center gap-10">
             <Countdown />
             <Logo />
