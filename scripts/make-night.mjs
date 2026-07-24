@@ -1,4 +1,4 @@
-// Bakes a real day-to-night conversion of public/background.jpg into
+﻿// Bakes a real day-to-night conversion of public/background.jpg into
 // public/background-night.jpg. Not a uniform dim:
 //  - the sky is replaced with a dark night gradient
 //  - shadows and midtones get a cool moonlit grade, highlights keep sheen
@@ -113,68 +113,6 @@ for (let y = 0; y < H; y++) {
       )
     }
     out[i + 3] = 255
-  }
-}
-
-// ---- Pass 3: composite the real moon photo (scripts/assets/moon.jpg),
-// after the blur so it stays sharp. Screen blending makes its black
-// background vanish against the night sky. ----
-const moonX = 0.62 * W
-const moonY = 0.14 * H
-const MOON_DIAMETER = Math.round(0.06 * W)
-
-const probe = await sharp('scripts/assets/moon.jpg')
-  .raw()
-  .toBuffer({ resolveWithObject: true })
-const mW = probe.info.width
-const mH = probe.info.height
-const mC = probe.info.channels
-let mx0 = mW
-let mx1 = 0
-let my0 = mH
-let my1 = 0
-for (let y = 0; y < mH; y++) {
-  for (let x = 0; x < mW; x++) {
-    const i = (y * mW + x) * mC
-    const L =
-      0.2126 * probe.data[i] +
-      0.7152 * probe.data[i + 1] +
-      0.0722 * probe.data[i + 2]
-    if (L > 25) {
-      if (x < mx0) mx0 = x
-      if (x > mx1) mx1 = x
-      if (y < my0) my0 = y
-      if (y > my1) my1 = y
-    }
-  }
-}
-
-const { data: moon, info: moonInfo } = await sharp('scripts/assets/moon.jpg')
-  .extract({ left: mx0, top: my0, width: mx1 - mx0 + 1, height: my1 - my0 + 1 })
-  .resize({
-    width: MOON_DIAMETER,
-    height: MOON_DIAMETER,
-    fit: 'fill',
-    kernel: 'lanczos3',
-  })
-  .raw()
-  .toBuffer({ resolveWithObject: true })
-
-const left = Math.round(moonX - MOON_DIAMETER / 2)
-const top = Math.round(moonY - MOON_DIAMETER / 2)
-for (let y = 0; y < MOON_DIAMETER; y++) {
-  const ty = top + y
-  if (ty < 0 || ty >= H) continue
-  for (let x = 0; x < MOON_DIAMETER; x++) {
-    const tx = left + x
-    if (tx < 0 || tx >= W) continue
-    const si = (y * MOON_DIAMETER + x) * moonInfo.channels
-    const di = (ty * W + tx) * 4
-    for (let c = 0; c < 3; c++) {
-      const bg = out[di + c]
-      const fg = moon[si + c]
-      out[di + c] = 255 - ((255 - bg) * (255 - fg)) / 255
-    }
   }
 }
 
