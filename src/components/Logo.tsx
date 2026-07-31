@@ -13,7 +13,6 @@ export default function Logo() {
       animate={{ opacity: 1 }}
       transition={{ duration: 1.2, delay: 0.9 }}
     >
-      <span className="text-2xl font-light text-white/50 select-none">-</span>
       <div className="[perspective:800px]">
         <div className="animate-spin-y [transform-style:preserve-3d]">
           {imgFailed ? (
