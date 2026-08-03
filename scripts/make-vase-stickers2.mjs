@@ -124,17 +124,17 @@ const solid = (color) =>
     .resize(S, S)
     .png()
     .toBuffer()
-  const plateSize = 840
-  const qrSize = 700
+  const plateSize = 560
+  const qrSize = 464
   const plate = Buffer.from(
-    `<svg width="${plateSize}" height="${plateSize}"><rect width="${plateSize}" height="${plateSize}" rx="56" fill="${PORC}"/></svg>`,
+    `<svg width="${plateSize}" height="${plateSize}"><rect width="${plateSize}" height="${plateSize}" rx="44" fill="${PORC}"/></svg>`,
   )
   const bq = await badgedQr(qrSize, NAVY, PORC)
   await save(
     sharp(photo),
     [
-      { input: plate, left: 100, top: 400 },
-      { input: bq, left: 100 + (plateSize - qrSize) / 2, top: 400 + (plateSize - qrSize) / 2 },
+      { input: plate, left: 130, top: 130 },
+      { input: bq, left: 130 + (plateSize - qrSize) / 2, top: 130 + (plateSize - qrSize) / 2 },
     ],
     'vase2-1-foto-plade.png',
   )
