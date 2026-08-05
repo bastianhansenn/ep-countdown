@@ -174,4 +174,22 @@ async function badgedQr(size) {
     ],
     'a3-qr-vase.png',
   )
+
+  // Square edition: 297x297 mm at 300 dpi.
+  const SQ = 3508
+  const sqTop = 190
+  const sqCaption = Buffer.from(
+    `<svg width="${SQ}" height="${SQ}"><text x="${SQ / 2}" y="3392" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="100" letter-spacing="56" fill="${NAVY}">02.10.2026</text></svg>`,
+  )
+  await sharp({ create: { width: SQ, height: SQ, channels: 4, background: PORC } })
+    .composite([
+      { input: await sharp(qrSvg).png().toBuffer(), left: (SQ - QSIZE) / 2, top: sqTop },
+      { input: badge, left: (SQ - ring) / 2, top: sqTop + (QSIZE - ring) / 2 },
+      { input: l, left: Math.round((SQ - 365) / 2), top: sqTop + Math.round((QSIZE - 365) / 2) },
+      { input: sqCaption },
+    ])
+    .withMetadata({ density: 300 })
+    .png()
+    .toFile('stickers/kvadrat-qr-vase.png')
+  console.log('wrote stickers/kvadrat-qr-vase.png')
 }
