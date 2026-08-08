@@ -78,8 +78,13 @@ export default function Scene() {
       <pointLight position={[-5, 2, -3]} color="#3355ff" intensity={0.8} decay={0} />
       <pointLight position={[4, -1, -4]} color="#7744cc" intensity={0.4} decay={0} />
 
+      {/* Separate boundaries: the vase must not wait for the backdrop's
+          bigger download, and vice versa. Preload links in index.html warm
+          all of these in parallel with the JS bundle. */}
       <Suspense fallback={null}>
         <Backdrop />
+      </Suspense>
+      <Suspense fallback={null}>
         <MuseumDisplay />
         {/* Procedural environment map instead of an HDR preset: presets fetch
             from a CDN at runtime, and a failed fetch crashes the canvas tree.
