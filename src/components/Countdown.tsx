@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion'
 import { useCountdown } from '../hooks/useCountdown'
 
 const UNITS = [
@@ -12,11 +11,7 @@ export default function Countdown() {
   const state = useCountdown()
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 1.2, delay: 0.4, ease: 'easeOut' }}
-    >
+    <div>
       {state.released ? (
         <p className="text-3xl font-extralight uppercase tracking-[0.5em] text-white/90 md:text-4xl">
           Released
@@ -35,6 +30,6 @@ export default function Countdown() {
           ))}
         </div>
       )}
-    </motion.div>
+    </div>
   )
 }

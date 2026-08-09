@@ -1,5 +1,5 @@
-import { Suspense, useMemo } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Suspense, useMemo, useRef } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Environment, Lightformer, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import Pedestal from './Pedestal'
@@ -29,6 +29,18 @@ function Backdrop() {
       <meshBasicMaterial map={texture} toneMapped={false} />
     </mesh>
   )
+}
+
+// Mounts only after the suspended textures resolve; fires after the second
+// frame, i.e. once the first real draw (including shader compilation) is on
+// screen. That is the page's "everything is ready" signal.
+function ReadyProbe({ onReady }: { onReady: () => void }) {
+  const frames = useRef(0)
+  useFrame(() => {
+    frames.current++
+    if (frames.current === 2) onReady()
+  })
+  return null
 }
 
 // Group origin sits at the pedestal top: the vase stands at local y = 0 and
@@ -63,7 +75,7 @@ function MuseumDisplay() {
   )
 }
 
-export default function Scene() {
+export default function Scene({ onReady }: { onReady: () => void }) {
   return (
     <Canvas
       camera={{ position: [0, 0, 10], fov: 45 }}
@@ -86,6 +98,7 @@ export default function Scene() {
       </Suspense>
       <Suspense fallback={null}>
         <MuseumDisplay />
+        <ReadyProbe onReady={onReady} />
         {/* Procedural environment map instead of an HDR preset: presets fetch
             from a CDN at runtime, and a failed fetch crashes the canvas tree.
             These panels render into a cube map once and give the glass and
