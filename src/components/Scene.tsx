@@ -4,7 +4,6 @@ import { Environment, Lightformer, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import Pedestal from './Pedestal'
 import Vase from './Vase'
-import GlassCase from './GlassCase'
 
 // The night photo lives INSIDE the WebGL scene (not only in the DOM), so the
 // transmissive glass can refract it. Sized like CSS object-cover against the
@@ -70,7 +69,6 @@ function MuseumDisplay() {
       <primitive object={spotTarget} position={[0, 0.8, 0]} />
       <Pedestal />
       <Vase />
-      <GlassCase />
     </group>
   )
 }

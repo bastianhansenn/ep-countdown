@@ -4,6 +4,7 @@ import Scene from './components/Scene'
 import Countdown from './components/Countdown'
 import Logo from './components/Logo'
 import AudioPlayer from './components/AudioPlayer'
+import ListenButton from './components/ListenButton'
 
 // The whole page reveals in ONE moment: everything stays hidden until the 3D
 // scene has drawn its first real frame (textures loaded, shaders compiled)
@@ -51,6 +52,7 @@ export default function App() {
       <div className="pointer-events-none absolute inset-0 z-30">
         <div className="mx-auto flex h-full max-w-7xl flex-col items-center justify-end px-6 pb-20 md:items-end md:justify-center md:pb-0 md:pr-16 lg:pr-24">
           <div className="flex flex-col items-center gap-10">
+            <ListenButton />
             <Countdown />
             <Logo />
           </div>

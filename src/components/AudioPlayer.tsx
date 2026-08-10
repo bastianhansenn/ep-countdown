@@ -40,6 +40,7 @@ export default function AudioPlayer() {
       src.connect(gain)
       src.start()
       setPlaying(true)
+      window.dispatchEvent(new CustomEvent('atte-audio-playing'))
     }
     startRef.current = () => {
       ctx.resume().then(start).catch(() => {})
