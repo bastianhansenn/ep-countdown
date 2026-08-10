@@ -53,7 +53,7 @@ function MuseumDisplay() {
 
   return (
     <group
-      position={isMobile ? [0, -0.06, -3] : [-2.2, 0.73, -3.5]}
+      position={isMobile ? [0, 0.26, -3] : [-2.2, 1.1, -3.5]}
       scale={isMobile ? 0.95 : 1.12}
     >
       {/* Cool overhead beam, like a night-lit museum piece. */}
@@ -67,8 +67,15 @@ function MuseumDisplay() {
         decay={0}
       />
       <primitive object={spotTarget} position={[0, 0.8, 0]} />
-      <Pedestal />
-      <Vase />
+      {/* Pedestal scaled up a touch (top stays at y=0, bottom reaches
+          deeper, compensated by the group's y); vase scaled down a touch,
+          shrinking toward its base so it keeps standing on the plate. */}
+      <group scale={1.1}>
+        <Pedestal />
+      </group>
+      <group scale={0.88}>
+        <Vase />
+      </group>
     </group>
   )
 }
