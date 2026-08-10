@@ -8,6 +8,9 @@ export default function UnlockButton({ onUnlock }: { onUnlock: () => void }) {
 
   const handleClick = () => {
     if (engaged) return
+    // Synchronous dispatch: AudioPlayer calls play() inside this very click,
+    // which is what iOS requires before it allows sound.
+    window.dispatchEvent(new CustomEvent('atte-request-audio'))
     setEngaged(true)
     setTimeout(onUnlock, 280)
   }

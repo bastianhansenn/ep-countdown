@@ -1,85 +1,70 @@
 import { useEffect, useRef, useState } from 'react'
 
-// Looping site audio via Web Audio: the whole track is decoded to a buffer
-// and looped sample-accurately (no gap at the seam, unlike <audio loop>).
-// Browsers refuse sound before a user gesture, so: try immediately (allowed
-// for returning visitors), otherwise start on the first pointer/key input
-// anywhere. The speaker button toggles mute and is itself a valid gesture.
+// Site audio through an <audio> element rather than pure Web Audio: on iOS
+// an element play() inside a gesture is the only reliable unlock, and media
+// element playback ignores the physical silent switch (Web Audio does not).
+// The track loops natively; play is attempted immediately (returning
+// visitors) and otherwise started by the first gesture anywhere.
 export default function AudioPlayer() {
   const [muted, setMuted] = useState(
     () => localStorage.getItem('atte-muted') === '1',
   )
   const [playing, setPlaying] = useState(false)
-  const ctxRef = useRef<AudioContext | null>(null)
-  const gainRef = useRef<GainNode | null>(null)
-  const startRef = useRef<() => void>(() => {})
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
+    const el = new Audio('./intro.m4a')
+    el.loop = true
+    el.preload = 'auto'
+    audioRef.current = el
+
     let disposed = false
-    let started = false
-    const ctx = new AudioContext()
-    const gain = ctx.createGain()
-    gain.connect(ctx.destination)
-    ctxRef.current = ctx
-    gainRef.current = gain
-
-    // Fetch and decode eagerly so the first gesture gives instant sound.
-    const bufferPromise = fetch('./intro.m4a')
-      .then((r) => r.arrayBuffer())
-      .then((ab) => ctx.decodeAudioData(ab))
-      .catch(() => null)
-
-    const start = async () => {
-      if (started || disposed) return
-      const buffer = await bufferPromise
-      if (!buffer || started || disposed) return
-      started = true
-      const src = ctx.createBufferSource()
-      src.buffer = buffer
-      src.loop = true
-      src.connect(gain)
-      src.start()
-      setPlaying(true)
-      window.dispatchEvent(new CustomEvent('atte-audio-playing'))
+    const tryPlay = () => {
+      el.play()
+        .then(() => {
+          if (disposed) return
+          setPlaying(true)
+          window.dispatchEvent(new CustomEvent('atte-audio-playing'))
+          removeListeners()
+        })
+        .catch(() => {})
     }
-    startRef.current = () => {
-      ctx.resume().then(start).catch(() => {})
+    const removeListeners = () => {
+      window.removeEventListener('pointerdown', tryPlay)
+      window.removeEventListener('touchend', tryPlay)
+      window.removeEventListener('click', tryPlay)
+      window.removeEventListener('keydown', tryPlay)
     }
 
-    // Attempt autoplay; if the context is suspended, arm one-time listeners
-    // for the first interaction anywhere on the page.
-    ctx.resume().then(() => {
-      if (ctx.state === 'running') start()
-    }).catch(() => {})
-
-    const onInteract = () => {
-      ctx.resume().then(start).catch(() => {})
-    }
-    window.addEventListener('pointerdown', onInteract)
-    window.addEventListener('keydown', onInteract)
-    ctx.addEventListener('statechange', onInteract)
+    tryPlay()
+    window.addEventListener('pointerdown', tryPlay)
+    window.addEventListener('touchend', tryPlay)
+    window.addEventListener('click', tryPlay)
+    window.addEventListener('keydown', tryPlay)
+    window.addEventListener('atte-request-audio', tryPlay)
 
     return () => {
       disposed = true
-      window.removeEventListener('pointerdown', onInteract)
-      window.removeEventListener('keydown', onInteract)
-      ctx.removeEventListener('statechange', onInteract)
-      ctx.close().catch(() => {})
+      removeListeners()
+      window.removeEventListener('atte-request-audio', tryPlay)
+      el.pause()
+      el.src = ''
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    const gain = gainRef.current
-    const ctx = ctxRef.current
-    if (gain && ctx) {
-      gain.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.05)
-    }
+    if (audioRef.current) audioRef.current.muted = muted
     localStorage.setItem('atte-muted', muted ? '1' : '0')
   }, [muted])
 
   const toggle = () => {
-    startRef.current()
+    const el = audioRef.current
+    if (el && el.paused) {
+      el.play().then(() => {
+        setPlaying(true)
+        window.dispatchEvent(new CustomEvent('atte-audio-playing'))
+      }).catch(() => {})
+    }
     setMuted((m) => !m)
   }
 
