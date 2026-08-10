@@ -18,8 +18,12 @@ export default function Countdown() {
         </p>
       ) : (
         <div className="flex gap-6 md:gap-10">
-          {UNITS.map(([key, label]) => (
-            <div key={key} className="flex flex-col items-center">
+          {UNITS.map(([key, label], i) => (
+            <div
+              key={key}
+              className="animate-cd-reveal flex flex-col items-center"
+              style={{ animationDelay: `${i * 0.5}s` }}
+            >
               <span className="text-4xl font-extralight tabular-nums tracking-[0.15em] text-white/90 md:text-5xl">
                 {String(state[key]).padStart(2, '0')}
               </span>
