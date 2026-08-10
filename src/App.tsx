@@ -3,6 +3,7 @@ import Background from './components/Background'
 import Scene from './components/Scene'
 import Countdown from './components/Countdown'
 import Logo from './components/Logo'
+import AudioPlayer from './components/AudioPlayer'
 
 // The whole page reveals in ONE moment: everything stays hidden until the 3D
 // scene has drawn its first real frame (textures loaded, shaders compiled)
@@ -55,6 +56,8 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      <AudioPlayer />
     </main>
   )
 }
