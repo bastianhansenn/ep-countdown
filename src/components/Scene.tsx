@@ -73,7 +73,7 @@ function MuseumDisplay() {
       <group scale={1.1}>
         <Pedestal />
       </group>
-      <group scale={0.88}>
+      <group scale={0.7}>
         <Vase />
       </group>
     </group>

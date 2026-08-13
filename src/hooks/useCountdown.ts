@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
-// 2 October 2026, midnight local wall-clock time.
-const TARGET = new Date(2026, 9, 2, 0, 0, 0)
+// 16 October 2026, midnight local wall-clock time.
+const TARGET = new Date(2026, 9, 16, 0, 0, 0)
 
 export interface CountdownState {
   days: number

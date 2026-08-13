@@ -65,7 +65,7 @@ async function badgedQr(size) {
   const rows = [
     ['A', 640, '6/60'],
     ['T T E', 420, '6/36'],
-    ['0 2 1 0', 270, '6/24'],
+    ['1 6 1 0', 270, '6/24'],
     ['2 0 2 6', 180, '6/18'],
     ['A T T E . O N E', 112, '6/12'],
     ['SCAN NÅR DU ER TÆT NOK', 66, '6/9'],
@@ -83,7 +83,7 @@ async function badgedQr(size) {
       <rect x="254" y="254" width="${W - 508}" height="${H - 508}" fill="none" stroke="${NAVY}" stroke-width="4"/>
       <text x="${W / 2}" y="450" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="78" letter-spacing="34" fill="#9a978c">AUTORISERET SYNSPRØVE</text>
       ${rowSvg}
-      <text x="${W / 2}" y="4660" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="72" letter-spacing="24" fill="${NAVY}">NÆSTE LEDIGE TID: 02.10.2026</text>
+      <text x="${W / 2}" y="4660" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="72" letter-spacing="24" fill="${NAVY}">NÆSTE LEDIGE TID: 16.10.2026</text>
     </svg>`,
   )
   const logo = await logoBuf(260, 'black')
@@ -161,7 +161,7 @@ async function badgedQr(size) {
     `<svg width="${ring}" height="${ring}"><circle cx="${ring / 2}" cy="${ring / 2}" r="${ring / 2}" fill="${PORC}"/><circle cx="${ring / 2}" cy="${ring / 2}" r="${disc / 2}" fill="${NAVY}"/></svg>`,
   )
   const caption = Buffer.from(
-    `<svg width="${W}" height="${H}"><text x="${W / 2}" y="4540" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="118" letter-spacing="64" fill="${NAVY}">02.10.2026</text></svg>`,
+    `<svg width="${W}" height="${H}"><text x="${W / 2}" y="4540" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="118" letter-spacing="64" fill="${NAVY}">16.10.2026</text></svg>`,
   )
   const qrTop = 780
   await saveA3(
@@ -179,7 +179,7 @@ async function badgedQr(size) {
   const SQ = 3508
   const sqTop = 190
   const sqCaption = Buffer.from(
-    `<svg width="${SQ}" height="${SQ}"><text x="${SQ / 2}" y="3392" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="100" letter-spacing="56" fill="${NAVY}">02.10.2026</text></svg>`,
+    `<svg width="${SQ}" height="${SQ}"><text x="${SQ / 2}" y="3392" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="100" letter-spacing="56" fill="${NAVY}">16.10.2026</text></svg>`,
   )
   await sharp({ create: { width: SQ, height: SQ, channels: 4, background: PORC } })
     .composite([
