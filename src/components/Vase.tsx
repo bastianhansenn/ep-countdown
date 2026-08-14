@@ -92,7 +92,7 @@ export default function Vase() {
         ref={innerLight}
         position={[0, 1.9, 0]}
         color="#3366ff"
-        distance={4}
+        distance={0}
         decay={2}
         intensity={3.8}
       />

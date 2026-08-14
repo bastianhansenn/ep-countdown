@@ -1,17 +1,14 @@
-﻿// Bakes a real day-to-night conversion of public/background.jpg into
-// public/background-night.jpg. Not a uniform dim:
-//  - the sky is replaced with a dark night gradient
-//  - shadows and midtones get a cool moonlit grade, highlights keep sheen
-//  - depth of field: the deeper into the street (toward the vanishing
-//    point), the blurrier the image
-//  - a realistic moon (maria, limb darkening, crisp edge, no halo) is drawn
-//    last so it stays sharp
+// Bakes the professional street photo (real vase on the real pedestal) into
+// its night version for the site. The photo already carries natural depth of
+// field, so this is purely a grade: cool moonlit conversion, deeper shadows,
+// the pale sky replaced with a dark night gradient.
+// Source: scripts/assets/street-pro.jpg -> public/background-night.jpg
 // Run: node scripts/make-night.mjs
 import sharp from 'sharp'
 
-const SRC = 'public/background.jpg'
+const SRC = 'scripts/assets/street-pro.jpg'
 const OUT = 'public/background-night.jpg'
-const TARGET_W = 1920 // upscale so the moon and fine grades render crisply
+const TARGET_W = 2400
 
 const base = sharp(SRC).resize({ width: TARGET_W, kernel: 'lanczos3' })
 const { data, info } = await base
@@ -28,9 +25,52 @@ const smoothstep = (a, b, x) => {
 }
 const lerp = (a, b, t) => a + (b - a) * t
 
-// ---- Pass 1: night grade (no moon yet), remember the sky weight ----
-const skyW = new Float32Array(W * H)
+// ---- Pass 1: find the horizon line per column. Tonal masks cannot handle
+// the soft bokeh roof edges, so instead: walk each column from the top while
+// the pixels still read as pale sky; everything above that row IS sky. ----
+const isSkyPixel = (x, y) => {
+  const i = (y * W + x) * 4
+  const r = data[i]
+  const g = data[i + 1]
+  const b = data[i + 2]
+  const L = 0.2126 * r + 0.7152 * g + 0.0722 * b
+  const maxc = Math.max(r, g, b)
+  const minc = Math.min(r, g, b)
+  const sat = maxc === 0 ? 0 : (maxc - minc) / maxc
+  return L > 165 && sat < 0.22
+}
+const horizon = new Float32Array(W)
+for (let x = 0; x < W; x++) {
+  let y = 0
+  let miss = 0
+  while (y < H * 0.6) {
+    if (isSkyPixel(x, y)) {
+      miss = 0
+    } else {
+      miss++
+      if (miss > 8) break
+    }
+    y++
+  }
+  horizon[x] = Math.max(0, y - miss)
+}
+// Smooth the horizon: median for spike removal, then a box blur.
+const med = Float32Array.from(horizon)
+for (let x = 4; x < W - 4; x++) {
+  const win = []
+  for (let k = -4; k <= 4; k++) win.push(horizon[x + k])
+  win.sort((a, b) => a - b)
+  med[x] = win[4]
+}
+for (let pass = 0; pass < 2; pass++) {
+  for (let x = 8; x < W - 8; x++) {
+    let sum = 0
+    for (let k = -8; k <= 8; k++) sum += med[x + k]
+    med[x] = sum / 17
+  }
+}
 
+// ---- Pass 2: grade ----
 for (let y = 0; y < H; y++) {
   const fy = y / H
   for (let x = 0; x < W; x++) {
@@ -40,37 +80,36 @@ for (let y = 0; y < H; y++) {
     const b = data[i + 2]
 
     const L = 0.2126 * r + 0.7152 * g + 0.0722 * b
-    const maxc = Math.max(r, g, b)
-    const minc = Math.min(r, g, b)
-    const sat = maxc === 0 ? 0 : (maxc - minc) / maxc
 
-    const wSky =
-      smoothstep(160, 210, L) *
-      (1 - smoothstep(0.16, 0.34, sat)) *
-      (1 - smoothstep(0.52, 0.72, fy))
-    skyW[y * W + x] = wSky
+    // Full sky above the horizon, feathering a few pixels into the roofs so
+    // the bright bokeh transition is swallowed by the night sky.
+    const wSky = 1 - smoothstep(med[x] - 16, med[x] + 5, y)
 
-    const dr = lerp(L, r, 0.35) / 255
-    const dg = lerp(L, g, 0.35) / 255
-    const db = lerp(L, b, 0.35) / 255
-    let nr = Math.pow(dr, 1.42) * 0.5 * 0.55 * 255 * 1.9
-    let ng = Math.pow(dg, 1.42) * 0.6 * 0.55 * 255 * 1.9
-    let nb = Math.pow(db, 1.42) * 0.95 * 0.55 * 255 * 1.9
+    // Moonlit grade: desaturate toward luminance, darken through a tone
+    // curve, bias toward blue; shadows fall deeper than highlights.
+    const dr = lerp(L, r, 0.32) / 255
+    const dg = lerp(L, g, 0.32) / 255
+    const db = lerp(L, b, 0.32) / 255
+    let nr = Math.pow(dr, 1.5) * 0.48 * 255
+    let ng = Math.pow(dg, 1.5) * 0.58 * 255
+    let nb = Math.pow(db, 1.5) * 0.94 * 255
 
     const shadowLift = 1 - smoothstep(0, 90, L)
     nr += 4 * shadowLift
     ng += 7 * shadowLift
     nb += 16 * shadowLift
 
-    const wWet = smoothstep(150, 225, L) * smoothstep(0.52, 0.75, fy) * 0.5
-    nr += 24 * wWet
-    ng += 34 * wWet
-    nb += 62 * wWet
+    // Cold sheen on the brightest cobbles in the foreground.
+    const wWet = smoothstep(165, 235, L) * smoothstep(0.55, 0.8, fy) * 0.45
+    nr += 22 * wWet
+    ng += 30 * wWet
+    nb += 56 * wWet
 
-    const cloud = (L - 190) * 0.1
-    const skyR = lerp(7, 16, fy * 2.2) + cloud * 0.4
-    const skyG = lerp(11, 24, fy * 2.2) + cloud * 0.6
-    const skyB = lerp(26, 48, fy * 2.2) + cloud
+    // Night sky gradient with a whisper of the original cloud texture.
+    const cloud = (L - 200) * 0.08
+    const skyR = lerp(7, 15, fy * 3) + cloud * 0.4
+    const skyG = lerp(11, 23, fy * 3) + cloud * 0.6
+    const skyB = lerp(26, 46, fy * 3) + cloud
 
     data[i] = clamp255(lerp(nr, skyR, wSky))
     data[i + 1] = clamp255(lerp(ng, skyG, wSky))
@@ -79,46 +118,9 @@ for (let y = 0; y < H; y++) {
   }
 }
 
-// ---- Pass 2: depth of field toward the vanishing point ----
-const raw = { raw: { width: W, height: H, channels: 4 } }
-const levels = [data]
-for (const sigma of [2.2, 5.5, 10]) {
-  const { data: blurred } = await sharp(data, raw)
-    .blur(sigma)
-    .raw()
-    .toBuffer({ resolveWithObject: true })
-  levels.push(blurred)
-}
-
-const vpX = 0.5 * W
-const vpY = 0.47 * H
-const maxDist = Math.hypot(W * 0.5, H * 0.53)
-const out = Buffer.alloc(W * H * 4)
-
-for (let y = 0; y < H; y++) {
-  for (let x = 0; x < W; x++) {
-    const i = (y * W + x) * 4
-    const dn = Math.hypot(x - vpX, y - vpY) / maxDist
-    // 1 near the vanishing point (deep, blurry), 0 at the frame edges.
-    const tVp = 1 - smoothstep(0.08, 0.62, dn)
-    // The sky is always distant, so it gets a base blur as well.
-    const t = Math.max(tVp, skyW[y * W + x] * 0.55)
-
-    const level = t * (levels.length - 1)
-    const i0 = Math.min(levels.length - 2, Math.floor(level))
-    const frac = level - i0
-    for (let c = 0; c < 3; c++) {
-      out[i + c] = clamp255(
-        lerp(levels[i0][i + c], levels[i0 + 1][i + c], frac),
-      )
-    }
-    out[i + 3] = 255
-  }
-}
-
-await sharp(out, raw)
+await sharp(data, { raw: { width: W, height: H, channels: 4 } })
   .flatten({ background: '#000000' })
-  .jpeg({ quality: 92 })
+  .jpeg({ quality: 86 })
   .toFile(OUT)
 
 console.log(`wrote ${OUT} (${W}x${H})`)
