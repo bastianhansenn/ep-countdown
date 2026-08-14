@@ -1,42 +1,24 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 
-// The evening photo, pixel for pixel as a plain <img>, with the photographed
-// lid cut from the same image trembling gently on top. The lid overlay tracks
-// the object-cover crop across every window size. Constants must match the
-// output of scripts/make-evening.mjs.
-const IMG_W = 3600
-const IMG_H = 2437
+// The evening photo with the lid trembling gently on top.
+//
+// Alignment strategy: the photo and the lid live inside ONE wrapper whose
+// size is the object-cover rect computed in pure CSS (see .stage-cover), so
+// they can never drift apart (JS innerHeight and CSS dvh disagree on phones
+// whenever the address bar collapses, which offset the old sprite).
+//
+// Rendering strategy: the lid is NOT a separate bitmap but a WINDOW into the
+// same background.jpg (background-size/-position), so at rest the browser
+// samples the identical image at the identical scale: pixel-for-pixel
+// invisible on every device. evening-lid.png only supplies the feathered
+// alpha mask. Constants must match scripts/make-evening.mjs.
 const LID = { x0: 0.4608, x1: 0.5408, y0: 0.327, y1: 0.393 }
+const LID_W = LID.x1 - LID.x0
+const LID_H = LID.y1 - LID.y0
+const pct = (v: number) => `${(v * 100).toFixed(4)}%`
 
 export default function Stage({ onReady }: { onReady: () => void }) {
-  const lidRef = useRef<HTMLImageElement | null>(null)
-  const [layout, setLayout] = useState({ left: 0, top: 0, width: 0, height: 0 })
-  const readyCount = useRef(0)
-  const bump = () => {
-    readyCount.current++
-    if (readyCount.current === 2) onReady()
-  }
-
-  useLayoutEffect(() => {
-    const compute = () => {
-      const vw = window.innerWidth
-      const vh = window.innerHeight
-      const scale = Math.max(vw / IMG_W, vh / IMG_H)
-      const dw = IMG_W * scale
-      const dh = IMG_H * scale
-      const ox = (vw - dw) / 2
-      const oy = (vh - dh) / 2
-      setLayout({
-        left: ox + LID.x0 * dw,
-        top: oy + LID.y0 * dh,
-        width: (LID.x1 - LID.x0) * dw,
-        height: (LID.y1 - LID.y0) * dh,
-      })
-    }
-    compute()
-    window.addEventListener('resize', compute)
-    return () => window.removeEventListener('resize', compute)
-  }, [])
+  const lidRef = useRef<HTMLDivElement | null>(null)
 
   // A very mild rattle, as if the lid is about to lift: fractions of a pixel,
   // hinged at its base so the top trembles more than the rim, with a slow
@@ -61,30 +43,39 @@ export default function Stage({ onReady }: { onReady: () => void }) {
     return () => cancelAnimationFrame(raf)
   }, [])
 
+  const maskStyle = {
+    maskImage: "url('./evening-lid.png')",
+    maskSize: '100% 100%',
+    WebkitMaskImage: "url('./evening-lid.png')",
+    WebkitMaskSize: '100% 100%',
+  } as const
+
   return (
     <div className="absolute inset-0 z-10 overflow-hidden">
-      <img
-        src="./background.jpg"
-        alt=""
-        className="h-full w-full object-cover"
-        onLoad={bump}
-        onError={bump}
-      />
-      <img
-        ref={lidRef}
-        src="./evening-lid.png"
-        alt=""
-        className="absolute will-change-transform"
-        style={{
-          left: layout.left,
-          top: layout.top,
-          width: layout.width,
-          height: layout.height,
-          transformOrigin: '50% 92%',
-        }}
-        onLoad={bump}
-        onError={bump}
-      />
+      <div className="stage-cover">
+        <img
+          src="./background.jpg"
+          alt=""
+          className="h-full w-full"
+          onLoad={onReady}
+          onError={onReady}
+        />
+        <div
+          ref={lidRef}
+          className="absolute will-change-transform"
+          style={{
+            left: pct(LID.x0),
+            top: pct(LID.y0),
+            width: pct(LID_W),
+            height: pct(LID_H),
+            backgroundImage: "url('./background.jpg')",
+            backgroundSize: `${(100 / LID_W).toFixed(4)}% ${(100 / LID_H).toFixed(4)}%`,
+            backgroundPosition: `${((LID.x0 / (1 - LID_W)) * 100).toFixed(4)}% ${((LID.y0 / (1 - LID_H)) * 100).toFixed(4)}%`,
+            transformOrigin: '50% 92%',
+            ...maskStyle,
+          }}
+        />
+      </div>
     </div>
   )
 }
