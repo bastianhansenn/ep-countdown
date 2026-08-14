@@ -20,9 +20,9 @@ const pct = (v: number) => `${(v * 100).toFixed(4)}%`
 export default function Stage({ onReady }: { onReady: () => void }) {
   const lidRef = useRef<HTMLDivElement | null>(null)
 
-  // A very mild rattle, as if the lid is about to lift: fractions of a pixel,
-  // hinged at its base so the top trembles more than the rim, with a slow
-  // swell-and-settle envelope so it never reads as a loop.
+  // A mild constant rattle, as if the lid is about to lift: fractions of a
+  // pixel, hinged at its base so the top trembles more than the rim. The
+  // envelope only breathes a little, so the lid NEVER stands still.
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     let raf = 0
@@ -30,7 +30,7 @@ export default function Stage({ onReady }: { onReady: () => void }) {
       const el = lidRef.current
       if (el) {
         const t = performance.now() / 1000
-        const amp = (0.55 + 0.45 * Math.sin(t * 0.7)) * (reduced ? 0.4 : 1)
+        const amp = (0.85 + 0.15 * Math.sin(t * 0.7)) * (reduced ? 0.4 : 1)
         const unit = Math.max(0.4, window.innerHeight * 0.0005)
         const dy = amp * (Math.sin(t * 34) * 0.7 + Math.sin(t * 47 + 1.3) * 0.4) * unit
         const dx = amp * Math.sin(t * 41 + 0.7) * 0.25 * unit

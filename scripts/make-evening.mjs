@@ -267,24 +267,24 @@ for (let y = 0; y < H; y++) {
         skyLike * band,
       ) * (1 - protect)
 
-    // Ground: a gentler exposure (about -1 stop with a soft toe), keeping
-    // 88% of the photo's own color and a whisper of cool white balance.
+    // Ground: night-leaning exposure (about -1.5 stops with a soft toe),
+    // keeping 85% of the photo's own color and a cool white balance.
     const t = L / 255
-    const darkT = Math.pow(t, 1.1) * 0.74
+    const darkT = Math.pow(t, 1.18) * 0.62
     const scaleL = darkT / Math.max(t, 0.004)
     const gray = darkT * 255
-    const gr = lerp(gray, r * scaleL, 0.88) * 0.975
-    const gg = lerp(gray, g * scaleL, 0.88) * 0.99
-    const gb = lerp(gray, b * scaleL, 0.88) * 1.045
+    const gr = lerp(gray, r * scaleL, 0.85) * 0.96
+    const gg = lerp(gray, g * scaleL, 0.85) * 0.985
+    const gb = lerp(gray, b * scaleL, 0.85) * 1.06
 
     // Sky: the photo's own sky darkened (more at the top of the frame,
     // lighter residue toward the horizon) and pulled toward dusk blue-gray.
     // Clamped so the sky treatment can only ever darken (a dark roof pixel
     // caught by the feather must never be lifted into a glowing rim).
-    const f = lerp(0.42, 0.58, Math.min(1, fy * 2.4))
-    const sr = Math.min(lerp(r * f, 90, 0.3), gr)
-    const sg = Math.min(lerp(g * f, 104, 0.3), gg)
-    const sb = Math.min(lerp(b * f, 142, 0.3), gb)
+    const f = lerp(0.3, 0.46, Math.min(1, fy * 2.4))
+    const sr = Math.min(lerp(r * f, 74, 0.3), gr)
+    const sg = Math.min(lerp(g * f, 88, 0.3), gg)
+    const sb = Math.min(lerp(b * f, 126, 0.3), gb)
 
     let fr = clamp255(lerp(gr, sr, wSky))
     let fg = clamp255(lerp(gg, sg, wSky))
