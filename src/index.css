@@ -24,6 +24,20 @@ body {
   }
 }
 
+/* Soft pulsing glow at the lid seam. */
+@keyframes seam-glow {
+  0% {
+    opacity: 0.25;
+  }
+  100% {
+    opacity: 0.85;
+  }
+}
+
+.animate-seam-glow {
+  animation: seam-glow 2.9s ease-in-out infinite alternate;
+}
+
 /* Dramatic left-to-right countdown reveal: each unit sweeps in from blur. */
 @keyframes cd-reveal {
   0% {

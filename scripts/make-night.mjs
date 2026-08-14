@@ -8,7 +8,8 @@ import sharp from 'sharp'
 
 const SRC = 'scripts/assets/street-pro.jpg'
 const OUT = 'public/background-night.jpg'
-const TARGET_W = 2400
+const OUT_LID = 'public/night-lid.png'
+const TARGET_W = 3600
 
 const base = sharp(SRC).resize({ width: TARGET_W, kernel: 'lanczos3' })
 const { data, info } = await base
@@ -90,9 +91,9 @@ for (let y = 0; y < H; y++) {
     const dr = lerp(L, r, 0.32) / 255
     const dg = lerp(L, g, 0.32) / 255
     const db = lerp(L, b, 0.32) / 255
-    let nr = Math.pow(dr, 1.5) * 0.48 * 255
-    let ng = Math.pow(dg, 1.5) * 0.58 * 255
-    let nb = Math.pow(db, 1.5) * 0.94 * 255
+    let nr = Math.pow(dr, 1.45) * 0.52 * 255
+    let ng = Math.pow(dg, 1.45) * 0.62 * 255
+    let nb = Math.pow(db, 1.45) * 0.98 * 255
 
     const shadowLift = 1 - smoothstep(0, 90, L)
     nr += 4 * shadowLift
@@ -120,7 +121,33 @@ for (let y = 0; y < H; y++) {
 
 await sharp(data, { raw: { width: W, height: H, channels: 4 } })
   .flatten({ background: '#000000' })
-  .jpeg({ quality: 86 })
+  .jpeg({ quality: 88 })
   .toFile(OUT)
 
 console.log(`wrote ${OUT} (${W}x${H})`)
+
+// ---- Lid sprite: the photographed lid cut from the SAME night image, with
+// feathered edges, so the site can vibrate it on top of the still photo. ----
+const LID = { x0: 0.458, x1: 0.555, y0: 0.322, y1: 0.398 }
+const lx = Math.round(LID.x0 * W)
+const ly = Math.round(LID.y0 * H)
+const lw = Math.round((LID.x1 - LID.x0) * W)
+const lh = Math.round((LID.y1 - LID.y0) * H)
+const FEATHER = Math.round(lw * 0.06)
+
+const lidRgba = Buffer.alloc(lw * lh * 4)
+for (let y = 0; y < lh; y++) {
+  for (let x = 0; x < lw; x++) {
+    const si = ((ly + y) * W + (lx + x)) * 4
+    const di = (y * lw + x) * 4
+    lidRgba[di] = data[si]
+    lidRgba[di + 1] = data[si + 1]
+    lidRgba[di + 2] = data[si + 2]
+    const edge = Math.min(x, lw - 1 - x, y, lh - 1 - y)
+    lidRgba[di + 3] = Math.round(255 * Math.min(1, edge / FEATHER))
+  }
+}
+await sharp(lidRgba, { raw: { width: lw, height: lh, channels: 4 } })
+  .png()
+  .toFile(OUT_LID)
+console.log(`wrote ${OUT_LID} (${lw}x${lh}) box`, LID)
