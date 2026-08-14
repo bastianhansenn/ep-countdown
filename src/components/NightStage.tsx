@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 // object-cover crop across every window size.
 const IMG_W = 3600
 const IMG_H = 2405
-const LID = { x0: 0.458, x1: 0.555, y0: 0.322, y1: 0.398 }
+const LID = { x0: 0.468, x1: 0.547, y0: 0.327, y1: 0.393 }
 const GLOW = { x: 0.5068, y: 0.389 }
 
 export default function NightStage({ onReady }: { onReady: () => void }) {
@@ -60,10 +60,12 @@ export default function NightStage({ onReady }: { onReady: () => void }) {
       if (el) {
         const t = performance.now() / 1000
         const amp = (0.6 + 0.4 * Math.sin(t * 0.8)) * (reduced ? 0.4 : 1)
-        const unit = Math.max(1.4, window.innerHeight * 0.0022)
-        const dy = amp * (Math.sin(t * 38) * 0.9 + Math.sin(t * 51 + 1.3) * 0.6) * unit
-        const dx = amp * Math.sin(t * 47 + 0.7) * 0.45 * unit
-        const rot = amp * Math.sin(t * 43) * 0.4
+        // Subtle rattle: fractions of a pixel to ~1px, hinged at the base of
+        // the lid so the top trembles more than the rim.
+        const unit = Math.max(0.5, window.innerHeight * 0.0008)
+        const dy = amp * (Math.sin(t * 38) * 0.8 + Math.sin(t * 51 + 1.3) * 0.5) * unit
+        const dx = amp * Math.sin(t * 47 + 0.7) * 0.35 * unit
+        const rot = amp * Math.sin(t * 43) * 0.22
         el.style.transform = `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) rotate(${rot.toFixed(2)}deg)`
       }
       raf = requestAnimationFrame(tick)
@@ -103,6 +105,7 @@ export default function NightStage({ onReady }: { onReady: () => void }) {
           top: layout.lidTop,
           width: layout.lidWidth,
           height: layout.lidHeight,
+          transformOrigin: '50% 92%',
         }}
         onLoad={bump}
         onError={bump}

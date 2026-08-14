@@ -55,20 +55,14 @@ for (let x = 0; x < W; x++) {
   }
   horizon[x] = Math.max(0, y - miss)
 }
-// Smooth the horizon: median for spike removal, then a box blur.
+// Only a small median: enough to kill single-column spikes while keeping
+// the roof corners sharp (heavier smoothing melts gables and chimneys).
 const med = Float32Array.from(horizon)
-for (let x = 4; x < W - 4; x++) {
+for (let x = 2; x < W - 2; x++) {
   const win = []
-  for (let k = -4; k <= 4; k++) win.push(horizon[x + k])
+  for (let k = -2; k <= 2; k++) win.push(horizon[x + k])
   win.sort((a, b) => a - b)
-  med[x] = win[4]
-}
-for (let pass = 0; pass < 2; pass++) {
-  for (let x = 8; x < W - 8; x++) {
-    let sum = 0
-    for (let k = -8; k <= 8; k++) sum += med[x + k]
-    med[x] = sum / 17
-  }
+  med[x] = win[2]
 }
 
 // ---- Pass 2: grade ----
@@ -82,35 +76,34 @@ for (let y = 0; y < H; y++) {
 
     const L = 0.2126 * r + 0.7152 * g + 0.0722 * b
 
-    // Full sky above the horizon, feathering a few pixels into the roofs so
-    // the bright bokeh transition is swallowed by the night sky.
-    const wSky = 1 - smoothstep(med[x] - 16, med[x] + 5, y)
+    // Full sky above the horizon with a tight feather: the photo's own
+    // bokeh already softens the rooflines, so a crisp junction looks real.
+    const wSky = 1 - smoothstep(med[x] - 5, med[x] + 2, y)
 
-    // Moonlit grade: desaturate toward luminance, darken through a tone
-    // curve, bias toward blue; shadows fall deeper than highlights.
-    const dr = lerp(L, r, 0.32) / 255
-    const dg = lerp(L, g, 0.32) / 255
-    const db = lerp(L, b, 0.32) / 255
-    let nr = Math.pow(dr, 1.45) * 0.52 * 255
-    let ng = Math.pow(dg, 1.45) * 0.62 * 255
-    let nb = Math.pow(db, 1.45) * 0.98 * 255
+    // Night grade that keeps the photograph intact: scale each pixel's
+    // channels by a luminance-preserving ratio (a darker exposure with an
+    // S-curve for contrast), keep most of the original color, then shift
+    // the white balance coolly. No channel remapping = no plastic filter.
+    const t = L / 255
+    let darkT = Math.pow(t, 1.35) * 0.5
+    darkT = Math.max(0, 0.2 + (darkT - 0.2) * 1.18) // contrast around the mids
+    const scaleL = darkT / Math.max(t, 0.004)
+    const gray = darkT * 255
+    let nr = lerp(gray, r * scaleL, 0.68) * 0.85
+    let ng = lerp(gray, g * scaleL, 0.68) * 0.93
+    let nb = lerp(gray, b * scaleL, 0.68) * 1.16
 
-    const shadowLift = 1 - smoothstep(0, 90, L)
-    nr += 4 * shadowLift
-    ng += 7 * shadowLift
-    nb += 16 * shadowLift
-
-    // Cold sheen on the brightest cobbles in the foreground.
-    const wWet = smoothstep(165, 235, L) * smoothstep(0.55, 0.8, fy) * 0.45
-    nr += 22 * wWet
-    ng += 30 * wWet
-    nb += 56 * wWet
+    // Faint blue air in the deepest shadows.
+    const shadowLift = 1 - smoothstep(0, 80, L)
+    nr += 2 * shadowLift
+    ng += 4 * shadowLift
+    nb += 10 * shadowLift
 
     // Night sky gradient with a whisper of the original cloud texture.
-    const cloud = (L - 200) * 0.08
-    const skyR = lerp(7, 15, fy * 3) + cloud * 0.4
-    const skyG = lerp(11, 23, fy * 3) + cloud * 0.6
-    const skyB = lerp(26, 46, fy * 3) + cloud
+    const cloud = (L - 200) * 0.06
+    const skyR = lerp(9, 20, fy * 3) + cloud * 0.4
+    const skyG = lerp(13, 29, fy * 3) + cloud * 0.6
+    const skyB = lerp(30, 56, fy * 3) + cloud
 
     data[i] = clamp255(lerp(nr, skyR, wSky))
     data[i + 1] = clamp255(lerp(ng, skyG, wSky))
@@ -128,7 +121,7 @@ console.log(`wrote ${OUT} (${W}x${H})`)
 
 // ---- Lid sprite: the photographed lid cut from the SAME night image, with
 // feathered edges, so the site can vibrate it on top of the still photo. ----
-const LID = { x0: 0.458, x1: 0.555, y0: 0.322, y1: 0.398 }
+const LID = { x0: 0.468, x1: 0.547, y0: 0.327, y1: 0.393 }
 const lx = Math.round(LID.x0 * W)
 const ly = Math.round(LID.y0 * H)
 const lw = Math.round((LID.x1 - LID.x0) * W)
