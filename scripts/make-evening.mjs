@@ -53,10 +53,11 @@ for (let x = 0; x < W; x++) {
   // White porcelain reads as sky, so in the vase's columns the walk is
   // capped just above the finial: otherwise it marches THROUGH the white
   // lid and mislabels everything above as sky in exactly those columns.
-  const limit = Math.abs(x - 0.5 * W) < 0.045 * W ? H * 0.283 : H * 0.6
+  // The cap FADES in over a horizontal band: a hard on/off column produced
+  // a visible vertical seam in the background at the band boundary.
   let y = 0
   let miss = 0
-  while (y < limit) {
+  while (y < H * 0.6) {
     if (isSkyPixel(x, y)) {
       miss = 0
     } else {
@@ -65,7 +66,9 @@ for (let x = 0; x < W; x++) {
     }
     y++
   }
-  horizon[x] = Math.max(0, Math.min(y - miss, limit))
+  const walked = Math.max(0, y - miss)
+  const capW = 1 - smoothstep(0.04 * W, 0.052 * W, Math.abs(x - 0.5 * W))
+  horizon[x] = lerp(walked, Math.min(walked, H * 0.283), capW)
 }
 const med = Float32Array.from(horizon)
 for (let x = 2; x < W - 2; x++) {

@@ -20,22 +20,26 @@ const pct = (v: number) => `${(v * 100).toFixed(4)}%`
 export default function Stage({ onReady }: { onReady: () => void }) {
   const lidRef = useRef<HTMLDivElement | null>(null)
 
-  // A mild constant rattle, as if the lid is about to lift: fractions of a
-  // pixel, hinged at its base so the top trembles more than the rim. The
-  // envelope only breathes a little, so the lid NEVER stands still.
+  // The lid LIFTS gently instead of vibrating: it rises a few pixels, hovers
+  // with the faintest sway, and settles again, breathing on a slow cycle.
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const smooth = (a: number, b: number, x: number) => {
+      const s = Math.max(0, Math.min(1, (x - a) / (b - a)))
+      return s * s * (3 - 2 * s)
+    }
     let raf = 0
     const tick = () => {
       const el = lidRef.current
       if (el) {
         const t = performance.now() / 1000
-        const amp = (0.85 + 0.15 * Math.sin(t * 0.7)) * (reduced ? 0.4 : 1)
-        const unit = Math.max(0.4, window.innerHeight * 0.0005)
-        const dy = amp * (Math.sin(t * 34) * 0.7 + Math.sin(t * 47 + 1.3) * 0.4) * unit
-        const dx = amp * Math.sin(t * 41 + 0.7) * 0.25 * unit
-        const rot = amp * Math.sin(t * 39) * 0.1
-        el.style.transform = `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) rotate(${rot.toFixed(2)}deg)`
+        const cycle = (t % 5.6) / 5.6
+        // rest, rise (~1.3s), hover (~1.1s), settle (~1.7s), rest
+        const rise = smooth(0.08, 0.32, cycle) * (1 - smooth(0.52, 0.82, cycle))
+        const liftPx = Math.max(2, window.innerHeight * 0.0032)
+        const dy = -rise * liftPx * (reduced ? 0.4 : 1)
+        const rot = rise * 0.3 * Math.sin(t * 1.9)
+        el.style.transform = `translateY(${dy.toFixed(2)}px) rotate(${rot.toFixed(2)}deg)`
       }
       raf = requestAnimationFrame(tick)
     }
