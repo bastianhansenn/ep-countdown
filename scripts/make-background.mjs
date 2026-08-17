@@ -33,19 +33,31 @@ const fillPoly = (pts) => {
   const dn = pts.map(([hw, y]) => `${xOf(hw, -1).toFixed(1)},${rowOf(y).toFixed(1)}`).reverse()
   return `<polygon points="${[...up, ...dn].join(' ')}" fill="white"/>`
 }
-// Widen the lid silhouette a little for the mask so the brim's bright edge
-// highlights don't survive just outside it as specks.
-const lidPts = real.lid.map(([hw, y]) => [hw * 1.14 + 0.03, seamY + y])
-// The turned pedestal's disc rings flare a bit wider than the traced column
-// profile, so widen the pedestal silhouette for the mask (not for the mesh).
-const pedWide = real.pedestal.map(([hw, y]) => [hw * 1.4 + 0.05, y])
-// Extend the plate mask ~45px above plate.topY: the black plate's bright top
-// face is visible in perspective and pokes above the traced top plane,
-// leaving a bright streak otherwise. Widen it a touch too.
-const plTop = rowOf(plate.topY) - 45
-const plBot = rowOf(plate.bottomY) + 10
-const plHalf = plate.half * pxPerUnit * 1.24
-const finTopPy = FINIAL_TOP_V * H - 28
+// The mask must remove the object AND its blur halo, but stay small enough
+// that the 3D copy (scaled by COVER_SCALE in Scene.tsx) covers every filled
+// pixel. These margins are the minimum that erased the halo in testing;
+// scripts/check-coverage.mjs verifies the 3D silhouette still contains them.
+const lidPts = real.lid.map(([hw, y]) => [hw * 1.05 + 0.012, seamY + y])
+// The turned pedestal alternates wide discs and narrow necks, and the trace
+// under-measures the discs' blurred flanks. Removing only the traced width
+// leaves bright nubs of the real discs beside the 3D column. So the MASK uses
+// a windowed maximum of the profile (each row inherits the widest width
+// nearby), which sweeps the whole turned silhouette away; the extra removed
+// sliver next to the necks is blurred cobble, which the smooth fill matches.
+const pedMaxWin = real.pedestal.map((_, i, arr) => {
+  let m = 0
+  for (let k = Math.max(0, i - 8); k <= Math.min(arr.length - 1, i + 8); k++)
+    m = Math.max(m, arr[k][0])
+  return [m * 1.16 + 0.02, arr[i][1]]
+})
+const pedWide = pedMaxWin
+// The plate is a board seen slightly from above, so its lit TOP FACE extends
+// ~40px above the traced front edge. The 3D plate's own top face covers those
+// rows in perspective, so masking them is safe and removes the light band.
+const plTop = rowOf(plate.topY) - 42
+const plBot = rowOf(plate.bottomY) + 6
+const plHalf = plate.half * pxPerUnit
+const finTopPy = FINIAL_TOP_V * H - 14
 const finBotPy = rowOf(seamY + real.lid[real.lid.length - 1][1])
 const svg =
   `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">` +
@@ -54,15 +66,15 @@ const svg =
   fillPoly(lidPts) +
   fillPoly(pedWide) +
   `<rect x="${(axPx - plHalf).toFixed(1)}" y="${plTop.toFixed(1)}" width="${(plHalf * 2).toFixed(1)}" height="${(plBot - plTop).toFixed(1)}" fill="white"/>` +
-  `<rect x="${(axPx - 0.07 * W).toFixed(1)}" y="${finTopPy.toFixed(1)}" width="${(0.14 * W).toFixed(1)}" height="${(finBotPy - finTopPy).toFixed(1)}" fill="white"/>` +
+  `<rect x="${(axPx - 0.028 * W).toFixed(1)}" y="${finTopPy.toFixed(1)}" width="${(0.056 * W).toFixed(1)}" height="${(finBotPy - finTopPy).toFixed(1)}" fill="white"/>` +
   `</svg>`
 
 // Rasterise + dilate (blur) so the whole object, its blurred halo and its
 // contact shadow are inside the hole.
-const maskRaw = await sharp(Buffer.from(svg)).blur(18).raw().toBuffer()
+const maskRaw = await sharp(Buffer.from(svg)).blur(11).raw().toBuffer()
 const maskCh = maskRaw.length / (W * H)
 const mask = new Uint8Array(W * H) // 1 = hole, 0 = keep
-for (let p = 0; p < W * H; p++) mask[p] = maskRaw[p * maskCh] > 24 ? 1 : 0
+for (let p = 0; p < W * H; p++) mask[p] = maskRaw[p * maskCh] > 30 ? 1 : 0
 // Close the mask per row: fill every pixel between the first and last masked
 // pixel of the row. The turned pedestal's profile pinches to thin necks
 // between its discs, so the rasterised silhouette leaves notches where

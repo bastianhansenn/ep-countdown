@@ -18,6 +18,10 @@ const VASE_U = 0.5067
 const VASE_BASE_V = 0.649 // foot (model y = 0)
 const VASE_TOP_V = 0.325 // finial top (model y = MODEL_H)
 const VASE_MODEL_H = 3.02
+// The photographed vase was painted out of the backdrop with a small margin
+// (its blur halo), so the 3D copy is placed a few percent larger to cover
+// every filled pixel. Verified by scripts/check-coverage.mjs.
+const COVER_SCALE = 1.07
 
 // Shared object-cover math: the photo plane size at BACKDROP_Z.
 function useCoverPlane() {
@@ -64,7 +68,7 @@ function MuseumDisplay() {
   const spotTarget = useMemo(() => new THREE.Object3D(), [])
   const x = (VASE_U - 0.5) * planeW
   const yFoot = (0.5 - VASE_BASE_V) * planeH
-  const scale = ((VASE_BASE_V - VASE_TOP_V) * planeH) / VASE_MODEL_H
+  const scale = (((VASE_BASE_V - VASE_TOP_V) * planeH) / VASE_MODEL_H) * COVER_SCALE
 
   return (
     <group position={[x, yFoot, BACKDROP_Z + 0.3]} scale={scale}>
@@ -73,9 +77,9 @@ function MuseumDisplay() {
         position={[1.5, 7.5, 3]}
         target={spotTarget}
         color="#d8e4ff"
-        intensity={1.8}
+        intensity={0.5}
         angle={0.42}
-        penumbra={0.8}
+        penumbra={0.9}
         decay={0}
       />
       <primitive object={spotTarget} position={[0, 0.8, 0]} />
@@ -95,11 +99,13 @@ export default function Scene({ onReady }: { onReady: () => void }) {
     >
       {/* No fog: it would wash out the in-scene photo backdrop, and the
           baked depth-of-field in the image already carries the depth cue. */}
-      <ambientLight intensity={0.22} />
-      <directionalLight position={[4, 6, 5]} intensity={1.1} color="#ffffff" />
+      {/* Lit to match the photo: an overcast, slightly cool sky, soft and
+          low-contrast. A bright key would blow the glaze into plastic blue. */}
+      <ambientLight intensity={0.85} color="#dfe3e6" />
+      <directionalLight position={[4, 6, 5]} intensity={0.55} color="#f0f2f4" />
       {/* decay 0 = no physical falloff; these are distant rim accents. */}
-      <pointLight position={[-5, 2, -3]} color="#3355ff" intensity={0.8} decay={0} />
-      <pointLight position={[4, -1, -4]} color="#7744cc" intensity={0.4} decay={0} />
+      <pointLight position={[-5, 2, -3]} color="#3355ff" intensity={0.05} decay={0} />
+      <pointLight position={[4, -1, -4]} color="#7744cc" intensity={0.03} decay={0} />
 
       {/* Separate boundaries: the vase must not wait for the backdrop's
           bigger download, and vice versa. Preload links in index.html warm
@@ -117,25 +123,25 @@ export default function Scene({ onReady }: { onReady: () => void }) {
         <Environment resolution={256} frames={1}>
           <mesh scale={100}>
             <sphereGeometry args={[1, 16, 16]} />
-            <meshBasicMaterial color="#05050f" side={THREE.BackSide} />
+            <meshBasicMaterial color="#15161a" side={THREE.BackSide} />
           </mesh>
           <Lightformer
-            intensity={2}
-            color="#cfe0ff"
+            intensity={1.6}
+            color="#eef1f4"
             position={[5, 5, 5]}
             scale={[6, 6, 1]}
             target={[0, 0, 0]}
           />
           <Lightformer
-            intensity={3}
-            color="#3a5cff"
+            intensity={1.1}
+            color="#c9cdd3"
             position={[-6, 2, -4]}
             scale={[8, 4, 1]}
             target={[0, 0, 0]}
           />
           <Lightformer
-            intensity={1.5}
-            color="#7744cc"
+            intensity={0.7}
+            color="#bcbfc4"
             position={[6, -2, -5]}
             scale={[6, 3, 1]}
             target={[0, 0, 0]}

@@ -66,12 +66,14 @@ export default function Vase() {
     lid.current.rotation.z = amp * Math.sin(t * 43) * 0.008
     lid.current.rotation.x = amp * Math.sin(t * 36 + 2.1) * 0.008
 
-    // Inner blue light: slow pulse plus a nervous flicker.
+    // Inner blue light: slow pulse plus a nervous flicker. Kept low and
+    // short-range: it should read as a glow inside the porcelain and at the
+    // lid seam, not tint the whole vase and pedestal electric blue.
     innerLight.current.intensity =
-      (1.4 + 1.0 * pulse01 + 0.15 * Math.sin(t * 13.7)) * 2
+      (1.4 + 1.0 * pulse01 + 0.15 * Math.sin(t * 13.7)) * 0.3
 
     // The porcelain breathes with the light.
-    bodyMat.current.emissiveIntensity = 0.03 + 0.12 * pulse01
+    bodyMat.current.emissiveIntensity = 0.004 + 0.03 * pulse01
 
     seamMat.current.opacity = 0.25 + 0.5 * pulse01
     seamRing.current.scale.setScalar(1 + 0.02 * pulse01)
@@ -85,24 +87,24 @@ export default function Vase() {
         <meshPhysicalMaterial
           ref={bodyMat}
           map={texture}
-          roughness={0.18}
+          roughness={0.42}
           metalness={0}
-          clearcoat={0.6}
-          clearcoatRoughness={0.1}
-          envMapIntensity={0.7}
+          clearcoat={0.28}
+          clearcoatRoughness={0.25}
+          envMapIntensity={0.2}
           emissive="#1a4aff"
-          emissiveIntensity={0.03}
+          emissiveIntensity={0.006}
           side={THREE.DoubleSide}
         />
       </mesh>
 
       <pointLight
         ref={innerLight}
-        position={[0, LID_BASE_Y * 0.62, 0]}
+        position={[0, LID_BASE_Y * 0.72, 0]}
         color="#3366ff"
-        distance={4}
+        distance={2.2}
         decay={2}
-        intensity={3.8}
+        intensity={1.6}
       />
 
       {/* Fake glow ring in the seam gap over the neck rim; the real point
@@ -123,11 +125,11 @@ export default function Vase() {
         <mesh geometry={lidGeometry}>
           <meshPhysicalMaterial
             map={lidTexture}
-            roughness={0.2}
+            roughness={0.42}
             metalness={0}
-            clearcoat={1}
-            clearcoatRoughness={0.12}
-            envMapIntensity={0.7}
+            clearcoat={0.3}
+            clearcoatRoughness={0.25}
+            envMapIntensity={0.2}
             side={THREE.DoubleSide}
           />
         </mesh>
