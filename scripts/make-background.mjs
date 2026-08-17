@@ -78,38 +78,115 @@ for (let y = 0; y < H; y++) {
   if (first >= 0) for (let x = first; x <= last; x++) mask[y * W + x] = 1
 }
 
-// ---- Exemplar clone with per-row gradient-domain (Poisson) correction ----
-// A retoucher clones real road texture over the object rather than smearing a
-// gradient. For each row we copy a clean strip of the street from the side
-// (translated so a strip of the SAME width lands in the hole), then add a
-// smooth per-row colour ramp that forces both edges to match their
-// neighbours exactly (a 1-D Poisson solve). Result: real cobble/road texture,
-// seamless at the boundary, no smudge and no ghost silhouette. The side with
-// the more uniform strip (the open road, not the pallets or the red crate) is
-// chosen per row, then a light vertical smoothing hides any side-switch.
+// ---- Fill ----
+// The whole background is deep bokeh (the vase was the only thing in focus),
+// so behind it there is no sharp structure, only a smooth continuation of the
+// surrounding out-of-focus tones. The right fill is therefore a single smooth
+// harmonic membrane spanning the hole (it interpolates the real boundary
+// tones - bright far street up top, cobble tones lower - with no blob, seam
+// or streak), plus a faint grain re-introduced low down where the near
+// cobbles are only mildly blurred.
 const out = Buffer.from(data)
 const smooth = (t) => t * t * (3 - 2 * t)
-const lumAt = (x, y) => {
-  const i = (y * W + x) * 4
-  return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
-}
-const stripVar = (x0, x1, y) => {
-  let s = 0, s2 = 0, n = 0
-  for (let x = x0; x <= x1; x++) {
-    if (x < 0 || x >= W || mask[y * W + x]) return Infinity
-    const l = lumAt(x, y)
-    s += l
-    s2 += l * l
-    n++
+
+// Seed each row by linear interpolation between its two clean edges.
+for (let y = 0; y < H; y++) {
+  let x = 0
+  while (x < W) {
+    if (!mask[y * W + x]) {
+      x++
+      continue
+    }
+    const L = x
+    while (x < W && mask[y * W + x]) x++
+    const R = x - 1
+    const a = (y * W + Math.max(0, L - 1)) * 4
+    const b = (y * W + Math.min(W - 1, R + 1)) * 4
+    for (let xx = L; xx <= R; xx++) {
+      const t = R > L ? (xx - L) / (R - L) : 0
+      for (let c = 0; c < 3; c++)
+        out[(y * W + xx) * 4 + c] = Math.round(out[a + c] + (out[b + c] - out[a + c]) * t)
+    }
   }
-  if (!n) return Infinity
-  return s2 / n - (s / n) ** 2
 }
-// Pass 1 (road, fv >= 0.5): clone real cobble texture horizontally, seam-
-// corrected. Where no uniform road strip exists on either side, skip and let
-// the vertical pass handle it.
-const ROAD_V = 0.5
-for (let y = Math.floor(ROAD_V * H); y < H; y++) {
+// Gauss-Seidel harmonic relaxation over the hole (in place: converges about
+// twice as fast as Jacobi). Only the masked pixels are iterated; boundary
+// pixels stay fixed. Row-major order (interior pixels avoid the frame edge).
+const hole = []
+for (let y = 1; y < H - 1; y++)
+  for (let x = 1; x < W - 1; x++) if (mask[y * W + x]) hole.push(y * W + x)
+const jf = new Float32Array(W * H * 3)
+for (let p = 0; p < W * H; p++) for (let c = 0; c < 3; c++) jf[p * 3 + c] = out[p * 4 + c]
+for (let pass = 0; pass < 600; pass++) {
+  for (let k = 0; k < hole.length; k++) {
+    const p = hole[k]
+    const p3 = p * 3
+    jf[p3] = (jf[(p - 1) * 3] + jf[(p + 1) * 3] + jf[(p - W) * 3] + jf[(p + W) * 3]) / 4
+    jf[p3 + 1] = (jf[(p - 1) * 3 + 1] + jf[(p + 1) * 3 + 1] + jf[(p - W) * 3 + 1] + jf[(p + W) * 3 + 1]) / 4
+    jf[p3 + 2] = (jf[(p - 1) * 3 + 2] + jf[(p + 1) * 3 + 2] + jf[(p - W) * 3 + 2] + jf[(p + W) * 3 + 2]) / 4
+  }
+}
+for (let k = 0; k < hole.length; k++) {
+  const p = hole[k]
+  const i = p * 4
+  out[i] = Math.round(jf[p * 3])
+  out[i + 1] = Math.round(jf[p * 3 + 1])
+  out[i + 2] = Math.round(jf[p * 3 + 2])
+}
+
+// Inject the distant opening's brightness. Behind the vase's upper half is
+// the bright far end of the street, but it is fully occluded, so the harmonic
+// (which only sees the darker immediate surroundings) fills it too dark and
+// reads as a grey blob. Sample the real opening colour from the bright band
+// just above the vase and lift the hole interior toward it, most in the top
+// centre and fading to nothing at the edges (so the boundary stays seamless)
+// and by the time the road surface begins.
+const sampleBox = (x0, x1, y0, y1) => {
+  let r = 0, g = 0, b = 0, n = 0
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      if (x < 0 || x >= W || y < 0 || y >= H || mask[y * W + x]) continue
+      const i = (y * W + x) * 4
+      r += data[i]; g += data[i + 1]; b += data[i + 2]; n++
+    }
+  return n ? [r / n, g / n, b / n] : [200, 195, 185]
+}
+const axPxi = Math.round(AXIS * W)
+const bright = sampleBox(axPxi - 140, axPxi + 140, Math.round(0.22 * H), Math.round(0.28 * H))
+for (let y = 0; y < Math.round(0.56 * H); y++) {
+  const heightW = 1 - smooth(Math.max(0, Math.min(1, (y / H - 0.3) / 0.26)))
+  if (heightW <= 0.001) continue
+  let x = 0
+  while (x < W) {
+    if (!mask[y * W + x]) {
+      x++
+      continue
+    }
+    const L = x
+    while (x < W && mask[y * W + x]) x++
+    const R = x - 1
+    for (let xx = L; xx <= R; xx++) {
+      const dEdge = Math.min(xx - L, R - xx)
+      const interiorW = smooth(Math.max(0, Math.min(1, dEdge / 70)))
+      const lift = interiorW * heightW * 0.82
+      const i = (y * W + xx) * 4
+      for (let c = 0; c < 3; c++) out[i + c] = Math.round(out[i + c] * (1 - lift) + bright[c] * lift)
+    }
+  }
+}
+
+// Re-introduce faint cobble grain low in the frame (near cobbles are only
+// mildly out of focus). Add the surrounding HIGH-FREQUENCY detail translated
+// in from each side and crossfaded; strength ramps from 0 in the deep bokeh
+// up to a modest amount at the bottom, so the smooth opening is untouched.
+const blurRaw = await sharp(data, { raw: { width: W, height: H, channels: 4 } })
+  .blur(4)
+  .raw()
+  .toBuffer()
+const detail = (x, y, c) => data[(y * W + x) * 4 + c] - blurRaw[(y * W + x) * 4 + c]
+for (let y = 0; y < H; y++) {
+  const grain = smooth(Math.max(0, Math.min(1, (y / H - 0.58) / 0.25))) * 0.85
+  if (grain <= 0.001) continue
   let x = 0
   while (x < W) {
     if (!mask[y * W + x]) {
@@ -120,92 +197,21 @@ for (let y = Math.floor(ROAD_V * H); y < H; y++) {
     while (x < W && mask[y * W + x]) x++
     const R = x - 1
     const span = R - L + 1
-    const canL = L - span >= 0
-    const canR = R + span <= W - 1
-    const vL = canL ? stripVar(L - span, L - 1, y) : Infinity
-    const vR = canR ? stripVar(R + 1, R + span, y) : Infinity
-    if (Math.min(vL, vR) >= 900) continue // no cloneable strip -> vertical pass
-    const off = vL <= vR ? -span : span
-    const li = (y * W + Math.max(0, L - 1)) * 4
-    const ri = (y * W + Math.min(W - 1, R + 1)) * 4
-    for (let c = 0; c < 3; c++) {
-      const mA = data[li + c] - data[(y * W + (L + off)) * 4 + c]
-      const mB = data[ri + c] - data[(y * W + (R + off)) * 4 + c]
-      for (let xx = L; xx <= R; xx++) {
-        const t = span > 1 ? (xx - L) / (span - 1) : 0
-        const src = data[(y * W + (xx + off)) * 4 + c]
-        out[(y * W + xx) * 4 + c] = Math.max(0, Math.min(255, Math.round(src + mA + (mB - mA) * smooth(t))))
-      }
-    }
-  }
-}
-// Pass 2 (the distant opening, fv < ROAD_V): information is genuinely missing
-// behind the vase here. The natural fill is a smooth harmonic membrane that
-// honours ALL its boundaries at once - the bright sky above, the dark framing
-// buildings at the sides, the road below (already cloned) - which reproduces
-// the soft bright-centre-to-dark-edges gradient of the far street with no
-// figure-shaped blob and no streaks. Solved by Jacobi relaxation, only on the
-// still-unfilled upper hole; road pixels stay fixed as boundary.
-const upper = new Uint8Array(W * H)
-const yRoad = Math.floor(ROAD_V * H)
-for (let y = 0; y < yRoad; y++)
-  for (let x = 0; x < W; x++) if (mask[y * W + x]) upper[y * W + x] = 1
-// seed each upper pixel with its row-edge average for faster convergence
-for (let y = 0; y < yRoad; y++) {
-  let x = 0
-  while (x < W) {
-    if (!upper[y * W + x]) {
-      x++
-      continue
-    }
-    const L = x
-    while (x < W && upper[y * W + x]) x++
-    const R = x - 1
-    const a = (y * W + Math.max(0, L - 1)) * 4
-    const b = (y * W + Math.min(W - 1, R + 1)) * 4
+    let lc = L - 1
+    while (lc > 0 && mask[y * W + lc]) lc--
+    let rc = R + 1
+    while (rc < W - 1 && mask[y * W + rc]) rc++
     for (let xx = L; xx <= R; xx++) {
-      const t = R > L ? (xx - L) / (R - L) : 0
-      for (let c = 0; c < 3; c++) out[(y * W + xx) * 4 + c] = Math.round(out[a + c] + (out[b + c] - out[a + c]) * t)
-    }
-  }
-}
-const jf = new Float32Array(W * H * 3)
-for (let p = 0; p < W * H; p++) for (let c = 0; c < 3; c++) jf[p * 3 + c] = out[p * 4 + c]
-for (let pass = 0; pass < 400; pass++) {
-  const s = Float32Array.from(jf)
-  for (let y = 1; y < yRoad; y++) {
-    for (let x = 1; x < W - 1; x++) {
-      const p = y * W + x
-      if (!upper[p]) continue
-      for (let c = 0; c < 3; c++)
-        jf[p * 3 + c] = (s[(p - 1) * 3 + c] + s[(p + 1) * 3 + c] + s[(p - W) * 3 + c] + s[(p + W) * 3 + c]) / 4
-    }
-  }
-}
-for (let p = 0; p < W * H; p++) {
-  if (!upper[p]) continue
-  const i = p * 4
-  for (let c = 0; c < 3; c++) out[i + c] = Math.round(jf[p * 3 + c])
-}
-// Final smoothing, region-specific:
-//  - the distant opening (fv < ROAD_V) is heavily out of focus in the photo,
-//    so dissolve the vertical-interpolation streaks with a wide HORIZONTAL
-//    blur into a soft bright patch.
-//  - the cobbled road (fv >= ROAD_V) keeps its cloned texture; only a light
-//    VERTICAL smoothing hides any row-to-row side-switch seam.
-const src = Buffer.from(out)
-// The cobbled road keeps its cloned texture; only a light VERTICAL smoothing
-// hides any row-to-row side-switch seam. The harmonic opening above is
-// already smooth.
-for (let y = Math.max(2, Math.floor(ROAD_V * H)); y < H - 2; y++) {
-  for (let x = 0; x < W; x++) {
-    const p = y * W + x
-    if (!mask[p]) continue
-    const i = p * 4
-    for (let c = 0; c < 3; c++) {
-      out[i + c] = Math.round(
-        (src[((y - 2) * W + x) * 4 + c] + src[((y - 1) * W + x) * 4 + c] * 2 + src[i + c] * 2 + src[((y + 1) * W + x) * 4 + c] * 2 + src[((y + 2) * W + x) * 4 + c]) / 8,
-      )
+      const w = smooth(span > 1 ? (xx - L) / (span - 1) : 0)
+      let sl = xx - span
+      if (sl < 0 || mask[y * W + sl]) sl = lc
+      let sr = xx + span
+      if (sr > W - 1 || mask[y * W + sr]) sr = rc
+      const i = (y * W + xx) * 4
+      for (let c = 0; c < 3; c++) {
+        const d = detail(sl, y, c) * (1 - w) + detail(sr, y, c) * w
+        out[i + c] = Math.max(0, Math.min(255, out[i + c] + d * grain))
+      }
     }
   }
 }
