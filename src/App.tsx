@@ -22,7 +22,7 @@ export default function App() {
 
   useEffect(() => {
     const img = new Image()
-    img.src = './background-night.jpg'
+    img.src = './background.jpg'
     img
       .decode()
       .then(() => setBgReady(true))

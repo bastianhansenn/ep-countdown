@@ -6,14 +6,14 @@ import Pedestal from './Pedestal'
 import Vase from './Vase'
 import GlassCase from './GlassCase'
 
-// The night photo lives INSIDE the WebGL scene (not only in the DOM), so the
+// The street photo lives INSIDE the WebGL scene (not only in the DOM), so the
 // transmissive glass can refract it. Sized like CSS object-cover against the
-// camera frustum at its depth.
+// camera frustum at its depth. Must match public/background.jpg.
 const BACKDROP_Z = -14
-const IMG_ASPECT = 1920 / 1148
+const IMG_ASPECT = 3600 / 2405
 
 function Backdrop() {
-  const texture = useTexture('./background-night.jpg')
+  const texture = useTexture('./background.jpg')
   const aspect = useThree((s) => s.viewport.aspect)
   useMemo(() => {
     texture.colorSpace = THREE.SRGBColorSpace
