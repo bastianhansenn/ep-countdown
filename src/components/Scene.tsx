@@ -12,20 +12,32 @@ import GlassCase from './GlassCase'
 const BACKDROP_Z = -14
 const IMG_ASPECT = 3600 / 2405
 
-function Backdrop() {
-  const texture = useTexture('./background.jpg')
-  const aspect = useThree((s) => s.viewport.aspect)
-  useMemo(() => {
-    texture.colorSpace = THREE.SRGBColorSpace
-  }, [texture])
+// Where the photographed vase sits (fractions of the frame), from
+// scripts/trace-profiles.mjs, so the 3D copy lands exactly on it.
+const VASE_U = 0.5067
+const VASE_BASE_V = 0.649 // foot (model y = 0)
+const VASE_TOP_V = 0.325 // finial top (model y = MODEL_H)
+const VASE_MODEL_H = 3.02
 
+// Shared object-cover math: the photo plane size at BACKDROP_Z.
+function useCoverPlane() {
+  const aspect = useThree((s) => s.viewport.aspect)
   const dist = 10 - BACKDROP_Z
   const frusH = 2 * dist * Math.tan((45 * Math.PI) / 360)
   const frusW = frusH * aspect
   const k = Math.max(frusW / IMG_ASPECT, frusH)
+  return { planeW: IMG_ASPECT * k, planeH: k }
+}
+
+function Backdrop() {
+  const texture = useTexture('./background.jpg')
+  const { planeW, planeH } = useCoverPlane()
+  useMemo(() => {
+    texture.colorSpace = THREE.SRGBColorSpace
+  }, [texture])
   return (
     <mesh position={[0, 0, BACKDROP_Z]}>
-      <planeGeometry args={[IMG_ASPECT * k, k]} />
+      <planeGeometry args={[planeW, planeH]} />
       <meshBasicMaterial map={texture} toneMapped={false} />
     </mesh>
   )
@@ -43,20 +55,19 @@ function ReadyProbe({ onReady }: { onReady: () => void }) {
   return null
 }
 
-// Group origin sits at the pedestal top: the vase stands at local y = 0 and
-// the pedestal extends downward. Pushed back down the street; with a level
-// camera the ground plane keeps the same world y at any depth, so it still
-// stands on the cobblestones.
+// The ensemble is projected 1:1 onto the photographed vase: local y = 0 (the
+// vase foot) lands at VASE_BASE_V and the finial top at VASE_TOP_V, at the
+// same screen position and size regardless of window aspect, tracking the
+// backdrop's object-cover crop.
 function MuseumDisplay() {
-  const viewportWidth = useThree((s) => s.viewport.width)
-  const isMobile = viewportWidth < 7
+  const { planeW, planeH } = useCoverPlane()
   const spotTarget = useMemo(() => new THREE.Object3D(), [])
+  const x = (VASE_U - 0.5) * planeW
+  const yFoot = (0.5 - VASE_BASE_V) * planeH
+  const scale = ((VASE_BASE_V - VASE_TOP_V) * planeH) / VASE_MODEL_H
 
   return (
-    <group
-      position={isMobile ? [0, -0.06, -3] : [-2.2, 0.73, -3.5]}
-      scale={isMobile ? 0.95 : 1.12}
-    >
+    <group position={[x, yFoot, BACKDROP_Z + 0.3]} scale={scale}>
       {/* Cool overhead beam, like a night-lit museum piece. */}
       <spotLight
         position={[1.5, 7.5, 3]}

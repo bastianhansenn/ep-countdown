@@ -2,9 +2,17 @@ import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
-import { BODY_PROFILE, LID_PROFILE, sampleProfile } from '../lib/vaseProfiles'
+import { sampleProfile } from '../lib/vaseProfiles'
+import real from '../lib/realProfiles.json'
 
-const LID_BASE_Y = 2.52
+// Body/lid silhouettes traced 1:1 from the photographed vase
+// (scripts/trace-profiles.mjs). The lid rides 0.01 above the neck rim,
+// leaving a thin seam gap for the glow.
+const BODY_PROFILE = real.body as [number, number][]
+const LID_PROFILE = real.lid as [number, number][]
+const NECK_HALF = BODY_PROFILE[BODY_PROFILE.length - 1][0]
+const LID_BASE_Y = real.meta.seamY + 0.01
+const FIN = real.meta.finial
 
 export default function Vase() {
   const gl = useThree((s) => s.gl)
@@ -29,7 +37,7 @@ export default function Vase() {
   }, [texture, lidTexture, gl])
 
   const bodyGeometry = useMemo(
-    () => new THREE.LatheGeometry(sampleProfile(BODY_PROFILE, 128), 160),
+    () => new THREE.LatheGeometry(sampleProfile(BODY_PROFILE, 160), 160),
     [],
   )
   const lidGeometry = useMemo(
@@ -90,17 +98,17 @@ export default function Vase() {
 
       <pointLight
         ref={innerLight}
-        position={[0, 1.9, 0]}
+        position={[0, LID_BASE_Y * 0.62, 0]}
         color="#3366ff"
         distance={4}
         decay={2}
         intensity={3.8}
       />
 
-      {/* Fake glow ring in the 0.02 seam gap; the real point light spilling
-          through the gap grounds it. */}
-      <mesh ref={seamRing} position={[0, 2.51, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.26, 0.012, 8, 48]} />
+      {/* Fake glow ring in the seam gap over the neck rim; the real point
+          light spilling through the gap grounds it. */}
+      <mesh ref={seamRing} position={[0, real.meta.seamY, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[NECK_HALF, 0.014, 8, 64]} />
         <meshBasicMaterial
           ref={seamMat}
           color="#4d7dff"
@@ -125,8 +133,9 @@ export default function Vase() {
         </mesh>
 
         {/* Foo-dog finial like the photo: pale porcelain knob base with a
-            two-tone guardian silhouette on top. */}
-        <group position={[0, 0.26, 0]}>
+            two-tone guardian silhouette on top, sized to the traced finial
+            box (base at the dome top, height FIN.height). */}
+        <group position={[0, FIN.baseY, 0]} scale={FIN.height / 0.16}>
           <mesh position={[0, 0.01, 0]}>
             <cylinderGeometry args={[0.05, 0.06, 0.03, 24]} />
             <meshStandardMaterial color="#e8e6df" roughness={0.3} />
