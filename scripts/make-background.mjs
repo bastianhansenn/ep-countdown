@@ -78,31 +78,38 @@ for (let y = 0; y < H; y++) {
   if (first >= 0) for (let x = first; x <= last; x++) mask[y * W + x] = 1
 }
 
-// ---- Smooth-membrane fill ----
-// The object sits in the photo's deep-bokeh zone, so the correct fill is a
-// smooth surface spanning the hole, NOT copied structure (copying re-creates
-// ghost silhouettes/specks). Each row is seeded by a linear interpolation
-// between the average colour of a clean strip on its left and on its right,
-// which keeps the photo's horizontal bands (sky, far street, cobbles). Then
-// a few Jacobi smoothing passes turn the seed into a harmonic membrane that
-// is continuous with the surroundings in both directions.
+// ---- Exemplar clone with per-row gradient-domain (Poisson) correction ----
+// A retoucher clones real road texture over the object rather than smearing a
+// gradient. For each row we copy a clean strip of the street from the side
+// (translated so a strip of the SAME width lands in the hole), then add a
+// smooth per-row colour ramp that forces both edges to match their
+// neighbours exactly (a 1-D Poisson solve). Result: real cobble/road texture,
+// seamless at the boundary, no smudge and no ghost silhouette. The side with
+// the more uniform strip (the open road, not the pallets or the red crate) is
+// chosen per row, then a light vertical smoothing hides any side-switch.
 const out = Buffer.from(data)
-const edgeAvg = (y, from, dir) => {
-  let sr = 0, sg = 0, sb = 0, n = 0
-  let xx = from
-  for (let k = 0; k < 24 && xx >= 0 && xx < W; k++, xx += dir) {
-    if (mask[y * W + xx]) continue
-    const i = (y * W + xx) * 4
-    sr += data[i]
-    sg += data[i + 1]
-    sb += data[i + 2]
+const smooth = (t) => t * t * (3 - 2 * t)
+const lumAt = (x, y) => {
+  const i = (y * W + x) * 4
+  return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+}
+const stripVar = (x0, x1, y) => {
+  let s = 0, s2 = 0, n = 0
+  for (let x = x0; x <= x1; x++) {
+    if (x < 0 || x >= W || mask[y * W + x]) return Infinity
+    const l = lumAt(x, y)
+    s += l
+    s2 += l * l
     n++
   }
-  if (!n) return null
-  return [sr / n, sg / n, sb / n]
+  if (!n) return Infinity
+  return s2 / n - (s / n) ** 2
 }
-const smooth = (t) => t * t * (3 - 2 * t)
-for (let y = 0; y < H; y++) {
+// Pass 1 (road, fv >= 0.5): clone real cobble texture horizontally, seam-
+// corrected. Where no uniform road strip exists on either side, skip and let
+// the vertical pass handle it.
+const ROAD_V = 0.5
+for (let y = Math.floor(ROAD_V * H); y < H; y++) {
   let x = 0
   while (x < W) {
     if (!mask[y * W + x]) {
@@ -113,80 +120,92 @@ for (let y = 0; y < H; y++) {
     while (x < W && mask[y * W + x]) x++
     const R = x - 1
     const span = R - L + 1
-    const cL = edgeAvg(y, L - 1, -1) || edgeAvg(y, R + 1, 1) || [128, 128, 128]
-    const cR = edgeAvg(y, R + 1, 1) || cL
-    for (let xx = L; xx <= R; xx++) {
-      const w = smooth(span > 1 ? (xx - L) / (span - 1) : 0)
-      const i = (y * W + xx) * 4
-      for (let c = 0; c < 3; c++) out[i + c] = Math.round(cL[c] * (1 - w) + cR[c] * w)
+    const canL = L - span >= 0
+    const canR = R + span <= W - 1
+    const vL = canL ? stripVar(L - span, L - 1, y) : Infinity
+    const vR = canR ? stripVar(R + 1, R + span, y) : Infinity
+    if (Math.min(vL, vR) >= 900) continue // no cloneable strip -> vertical pass
+    const off = vL <= vR ? -span : span
+    const li = (y * W + Math.max(0, L - 1)) * 4
+    const ri = (y * W + Math.min(W - 1, R + 1)) * 4
+    for (let c = 0; c < 3; c++) {
+      const mA = data[li + c] - data[(y * W + (L + off)) * 4 + c]
+      const mB = data[ri + c] - data[(y * W + (R + off)) * 4 + c]
+      for (let xx = L; xx <= R; xx++) {
+        const t = span > 1 ? (xx - L) / (span - 1) : 0
+        const src = data[(y * W + (xx + off)) * 4 + c]
+        out[(y * W + xx) * 4 + c] = Math.max(0, Math.min(255, Math.round(src + mA + (mB - mA) * smooth(t))))
+      }
     }
   }
 }
-// Jacobi smoothing confined to the hole (boundary pixels stay fixed): turns
-// the per-row seed into a membrane smooth in both directions, erasing any
-// row-to-row banding.
-let buf = new Float32Array(W * H * 3)
-for (let p = 0; p < W * H; p++)
-  for (let c = 0; c < 3; c++) buf[p * 3 + c] = out[p * 4 + c]
-for (let pass = 0; pass < 60; pass++) {
-  const src = Float32Array.from(buf)
-  for (let y = 1; y < H - 1; y++) {
+// Pass 2 (the distant opening, fv < ROAD_V): information is genuinely missing
+// behind the vase here. The natural fill is a smooth harmonic membrane that
+// honours ALL its boundaries at once - the bright sky above, the dark framing
+// buildings at the sides, the road below (already cloned) - which reproduces
+// the soft bright-centre-to-dark-edges gradient of the far street with no
+// figure-shaped blob and no streaks. Solved by Jacobi relaxation, only on the
+// still-unfilled upper hole; road pixels stay fixed as boundary.
+const upper = new Uint8Array(W * H)
+const yRoad = Math.floor(ROAD_V * H)
+for (let y = 0; y < yRoad; y++)
+  for (let x = 0; x < W; x++) if (mask[y * W + x]) upper[y * W + x] = 1
+// seed each upper pixel with its row-edge average for faster convergence
+for (let y = 0; y < yRoad; y++) {
+  let x = 0
+  while (x < W) {
+    if (!upper[y * W + x]) {
+      x++
+      continue
+    }
+    const L = x
+    while (x < W && upper[y * W + x]) x++
+    const R = x - 1
+    const a = (y * W + Math.max(0, L - 1)) * 4
+    const b = (y * W + Math.min(W - 1, R + 1)) * 4
+    for (let xx = L; xx <= R; xx++) {
+      const t = R > L ? (xx - L) / (R - L) : 0
+      for (let c = 0; c < 3; c++) out[(y * W + xx) * 4 + c] = Math.round(out[a + c] + (out[b + c] - out[a + c]) * t)
+    }
+  }
+}
+const jf = new Float32Array(W * H * 3)
+for (let p = 0; p < W * H; p++) for (let c = 0; c < 3; c++) jf[p * 3 + c] = out[p * 4 + c]
+for (let pass = 0; pass < 400; pass++) {
+  const s = Float32Array.from(jf)
+  for (let y = 1; y < yRoad; y++) {
     for (let x = 1; x < W - 1; x++) {
       const p = y * W + x
-      if (!mask[p]) continue
-      for (let c = 0; c < 3; c++) {
-        buf[p * 3 + c] =
-          (src[(p - 1) * 3 + c] + src[(p + 1) * 3 + c] + src[(p - W) * 3 + c] + src[(p + W) * 3 + c]) / 4
-      }
+      if (!upper[p]) continue
+      for (let c = 0; c < 3; c++)
+        jf[p * 3 + c] = (s[(p - 1) * 3 + c] + s[(p + 1) * 3 + c] + s[(p - W) * 3 + c] + s[(p + W) * 3 + c]) / 4
     }
   }
 }
 for (let p = 0; p < W * H; p++) {
-  if (!mask[p]) continue
+  if (!upper[p]) continue
   const i = p * 4
-  for (let c = 0; c < 3; c++) out[i + c] = Math.round(buf[p * 3 + c])
+  for (let c = 0; c < 3; c++) out[i + c] = Math.round(jf[p * 3 + c])
 }
-
-// ---- Texture pass ----
-// The membrane is smooth; the cobbles around it carry fine grain. Add the
-// surrounding HIGH-FREQUENCY detail (photo minus a small blur) translated in
-// from each side and crossfaded. Detail is near-zero-mean and structureless,
-// so this grains the fill to match the cobbles without re-creating any object
-// shape.
-const blurRaw = await sharp(data, { raw: { width: W, height: H, channels: 4 } })
-  .blur(5)
-  .raw()
-  .toBuffer()
-const detail = (x, y, c) => {
-  const i = (y * W + x) * 4 + c
-  return data[i] - blurRaw[i]
-}
-for (let y = 0; y < H; y++) {
-  let x = 0
-  while (x < W) {
-    if (!mask[y * W + x]) {
-      x++
-      continue
-    }
-    const L = x
-    while (x < W && mask[y * W + x]) x++
-    const R = x - 1
-    const span = R - L + 1
-    let lc = L - 1
-    while (lc > 0 && mask[y * W + lc]) lc--
-    let rc = R + 1
-    while (rc < W - 1 && mask[y * W + rc]) rc++
-    for (let xx = L; xx <= R; xx++) {
-      const w = smooth(span > 1 ? (xx - L) / (span - 1) : 0)
-      let sl = xx - span
-      if (sl < 0 || mask[y * W + sl]) sl = lc
-      let sr = xx + span
-      if (sr > W - 1 || mask[y * W + sr]) sr = rc
-      const i = (y * W + xx) * 4
-      for (let c = 0; c < 3; c++) {
-        const d = detail(sl, y, c) * (1 - w) + detail(sr, y, c) * w
-        out[i + c] = Math.max(0, Math.min(255, out[i + c] + d * 0.9))
-      }
+// Final smoothing, region-specific:
+//  - the distant opening (fv < ROAD_V) is heavily out of focus in the photo,
+//    so dissolve the vertical-interpolation streaks with a wide HORIZONTAL
+//    blur into a soft bright patch.
+//  - the cobbled road (fv >= ROAD_V) keeps its cloned texture; only a light
+//    VERTICAL smoothing hides any row-to-row side-switch seam.
+const src = Buffer.from(out)
+// The cobbled road keeps its cloned texture; only a light VERTICAL smoothing
+// hides any row-to-row side-switch seam. The harmonic opening above is
+// already smooth.
+for (let y = Math.max(2, Math.floor(ROAD_V * H)); y < H - 2; y++) {
+  for (let x = 0; x < W; x++) {
+    const p = y * W + x
+    if (!mask[p]) continue
+    const i = p * 4
+    for (let c = 0; c < 3; c++) {
+      out[i + c] = Math.round(
+        (src[((y - 2) * W + x) * 4 + c] + src[((y - 1) * W + x) * 4 + c] * 2 + src[i + c] * 2 + src[((y + 1) * W + x) * 4 + c] * 2 + src[((y + 2) * W + x) * 4 + c]) / 8,
+      )
     }
   }
 }
