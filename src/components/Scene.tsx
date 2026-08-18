@@ -4,11 +4,11 @@ import { Environment, Lightformer, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import Pedestal from './Pedestal'
 import Vase from './Vase'
-import GlassCase from './GlassCase'
 
-// The street photo lives INSIDE the WebGL scene (not only in the DOM), so the
-// transmissive glass can refract it. Sized like CSS object-cover against the
-// camera frustum at its depth. Must match public/background.jpg.
+// The street photo lives INSIDE the WebGL scene as well as in the DOM, so the
+// vase is lit and composited against the same image. Sized like CSS
+// object-cover against the camera frustum at its depth. Must match
+// public/background.jpg.
 const BACKDROP_Z = -14
 const IMG_ASPECT = 3600 / 2405
 
@@ -85,7 +85,6 @@ function MuseumDisplay() {
       <primitive object={spotTarget} position={[0, 0.8, 0]} />
       <Pedestal />
       <Vase />
-      <GlassCase />
     </group>
   )
 }
@@ -118,8 +117,8 @@ export default function Scene({ onReady }: { onReady: () => void }) {
         <ReadyProbe onReady={onReady} />
         {/* Procedural environment map instead of an HDR preset: presets fetch
             from a CDN at runtime, and a failed fetch crashes the canvas tree.
-            These panels render into a cube map once and give the glass and
-            glaze their reflections, fully offline. */}
+            These panels render into a cube map once and give the glaze its
+            reflections, fully offline. */}
         <Environment resolution={256} frames={1}>
           <mesh scale={100}>
             <sphereGeometry args={[1, 16, 16]} />

@@ -1,4 +1,4 @@
-// Traces the REAL vase + pedestal silhouettes from public/background.jpg into
+// Traces the REAL vase + pedestal silhouettes from the original street photo
 // lathe profiles, so the 3D copy matches the photographed originals 1:1 in
 // form and size. Output: src/lib/realProfiles.json
 //
@@ -9,14 +9,22 @@
 import sharp from 'sharp'
 import { writeFileSync } from 'fs'
 
-const { data, info } = await sharp('public/background.jpg').ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+// Read the ORIGINAL photo, never public/background.jpg: that one has already
+// had the vase painted out (using these very profiles), so tracing it would
+// silently produce an empty silhouette.
+const { data, info } = await sharp('scripts/assets/street-pro.jpg')
+  .resize({ width: 3600, kernel: 'lanczos3' })
+  .ensureAlpha()
+  .raw()
+  .toBuffer({ resolveWithObject: true })
 const W = info.width
 const H = info.height
 
 const AXIS = 0.5067 // vase + pedestal axis (probed, px 1824)
 // Vertical landmarks (fractions of H), read from axis luminance:
 const FINIAL_TOP_V = 0.325
-const SEAM_V = 0.398 // neck top (mouth), just below the overhanging white brim
+const SEAM_V = 0.379 // underside of the lid's white brim: the dark collar
+                     // below it is the vase's own neck, not part of the lid
 const FOOT_BOTTOM_V = 0.649
 const MODEL_H = 3.02 // model units, foot (y=0) -> finial top
 const pxPerUnit = ((FOOT_BOTTOM_V - FINIAL_TOP_V) * H) / MODEL_H
@@ -127,20 +135,34 @@ const halfAt = (ay) => {
 // dark plate fills the mask box) up to the neck (SEAM_V). The small splayed
 // foot below 0.628 is added by hand from the measured foot width.
 const TRACE_TOP_V = 0.628
+// Stop the trace below the lid: the silhouette mask includes the lid's wide
+// white brim, so tracing all the way to the seam flares the neck out to brim
+// width. The straight neck above is added by hand at its measured width.
+const TRACE_END_V = 0.408
+const NECK_HALF = 0.31
 const bodySteps = 30
 let bodyR = []
 for (let i = 0; i <= bodySteps; i++) {
-  const fv = TRACE_TOP_V - (i / bodySteps) * (TRACE_TOP_V - SEAM_V)
+  const fv = TRACE_TOP_V - (i / bodySteps) * (TRACE_TOP_V - TRACE_END_V)
   bodyR.push(halfAt(Math.round(fv * H)))
 }
-for (let pass = 0; pass < 3; pass++) {
+// Heavy smoothing: the raw per-row widths wobble a few px, and a spline
+// through that wobble renders as dents in the lathe. The real vase is a clean
+// baluster, so the silhouette should be smooth.
+for (let pass = 0; pass < 12; pass++) {
   const s = [...bodyR]
   for (let i = 1; i < bodyR.length - 1; i++) bodyR[i] = (s[i - 1] + s[i] * 2 + s[i + 1]) / 4
 }
 const traced = bodyR.map((r, i) => {
-  const fv = TRACE_TOP_V - (i / bodySteps) * (TRACE_TOP_V - SEAM_V)
+  const fv = TRACE_TOP_V - (i / bodySteps) * (TRACE_TOP_V - TRACE_END_V)
   return [+r.toFixed(4), +yModel(fv).toFixed(4)]
 })
+// Neck: from the traced shoulder up to the seam, easing into NECK_HALF.
+const neck = [
+  [+((traced[traced.length - 1][0] + NECK_HALF) / 2).toFixed(4), +yModel(0.4).toFixed(4)],
+  [NECK_HALF, +yModel(0.393).toFixed(4)],
+  [NECK_HALF, +yModel(SEAM_V).toFixed(4)],
+]
 // Clean splayed foot below y(0.628), rim never at x=0 (no UV pole).
 const yTraceTop = yModel(TRACE_TOP_V) // ~0.196
 const footTopHalf = traced[0][0]
@@ -149,24 +171,23 @@ const body = [
   [+(footTopHalf * 0.82).toFixed(4), +(yTraceTop * 0.45).toFixed(4)],
   [+(footTopHalf * 0.9).toFixed(4), +(yTraceTop * 0.85).toFixed(4)],
   ...traced,
+  ...neck,
 ]
 
-// ---- Lid: hand arc from measured landmarks. A downward lip into the mouth,
-// the wide overhanging white brim (half ~0.47, wider than the 0.45 neck), a
-// short navy collar, then the domed cap up to the finial base. Local y from
-// the seam (mouth). ----
+// ---- Lid: hand arc from the measured landmarks. The removable lid is the
+// wide white porcelain brim (fv 0.369-0.379) and the navy dome above it up to
+// the finial base; the dark collar underneath belongs to the vase's neck.
+// Local y from the seam. ----
 const seamY = yModel(SEAM_V)
 const finBaseY = yModel(0.348)
 const lid = [
-  [0.36, 0], // collar meeting the neck rim
-  [0.44, +(yModel(0.392) - seamY).toFixed(4)], // brim underside flares out
-  [0.47, +(yModel(0.386) - seamY).toFixed(4)], // widest overhang
-  [0.44, +(yModel(0.381) - seamY).toFixed(4)], // brim top
-  [0.33, +(yModel(0.375) - seamY).toFixed(4)], // navy collar above brim
-  [0.34, +(yModel(0.366) - seamY).toFixed(4)],
-  [0.30, +(yModel(0.358) - seamY).toFixed(4)], // dome shoulder
-  [0.20, +(yModel(0.352) - seamY).toFixed(4)],
-  [0.11, +(finBaseY - seamY).toFixed(4)], // dome top / finial base
+  [0.34, 0], // brim underside, meeting the neck
+  [0.47, +(yModel(0.3765) - seamY).toFixed(4)], // widest overhang
+  [0.45, +(yModel(0.3725) - seamY).toFixed(4)], // brim top face
+  [0.34, +(yModel(0.3695) - seamY).toFixed(4)], // step up to the dome
+  [0.33, +(yModel(0.3635) - seamY).toFixed(4)],
+  [0.26, +(yModel(0.3565) - seamY).toFixed(4)], // dome shoulder
+  [0.14, +(finBaseY - seamY).toFixed(4)], // dome top / finial base
 ]
 
 // ---- Finial box for the primitive group ----

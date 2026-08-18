@@ -75,7 +75,7 @@ export default function Vase() {
     // The porcelain breathes with the light.
     bodyMat.current.emissiveIntensity = 0.004 + 0.03 * pulse01
 
-    seamMat.current.opacity = 0.25 + 0.5 * pulse01
+    seamMat.current.opacity = 0.12 + 0.28 * pulse01
     seamRing.current.scale.setScalar(1 + 0.02 * pulse01)
   })
 
@@ -115,7 +115,7 @@ export default function Vase() {
           ref={seamMat}
           color="#4d7dff"
           transparent
-          opacity={0.4}
+          opacity={0.28}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -134,25 +134,34 @@ export default function Vase() {
           />
         </mesh>
 
-        {/* Foo-dog finial like the photo: pale porcelain knob base with a
-            two-tone guardian silhouette on top, sized to the traced finial
-            box (base at the dome top, height FIN.height). */}
-        <group position={[0, FIN.baseY, 0]} scale={FIN.height / 0.16}>
-          <mesh position={[0, 0.01, 0]}>
-            <cylinderGeometry args={[0.05, 0.06, 0.03, 24]} />
-            <meshStandardMaterial color="#e8e6df" roughness={0.3} />
+        {/* Foo-dog finial like the photo: a pale porcelain knob with the
+            small guardian lying on it. Sized to the traced finial box, which
+            is ~0.25 units wide, so it reads at the vase's on-screen size
+            instead of vanishing to a dot. */}
+        <group position={[0, FIN.baseY, 0]} scale={FIN.height / 0.2}>
+          <mesh position={[0, 0.02, 0]}>
+            <cylinderGeometry args={[0.1, 0.13, 0.045, 24]} />
+            <meshStandardMaterial color="#dcdcd4" roughness={0.45} />
           </mesh>
-          <mesh position={[0, 0.06, 0]} scale={[1, 0.8, 1.25]}>
-            <sphereGeometry args={[0.055, 24, 18]} />
-            <meshStandardMaterial color="#dcd9d0" roughness={0.3} />
+          <mesh position={[0, 0.075, 0]} scale={[1.5, 0.85, 1]}>
+            <sphereGeometry args={[0.075, 24, 18]} />
+            <meshStandardMaterial color="#cfd0ca" roughness={0.45} />
           </mesh>
-          <mesh position={[0, 0.115, 0.045]}>
-            <sphereGeometry args={[0.038, 20, 16]} />
-            <meshStandardMaterial color="#31519e" roughness={0.25} />
+          <mesh position={[0, 0.14, 0.02]} scale={[1, 1.05, 1]}>
+            <sphereGeometry args={[0.062, 20, 16]} />
+            <meshStandardMaterial color="#c6c8c4" roughness={0.45} />
           </mesh>
-          <mesh position={[0, 0.1, -0.055]} rotation={[-0.6, 0, 0]}>
-            <coneGeometry args={[0.022, 0.06, 16]} />
-            <meshStandardMaterial color="#31519e" roughness={0.25} />
+          <mesh position={[0.055, 0.185, 0.03]}>
+            <sphereGeometry args={[0.026, 14, 12]} />
+            <meshStandardMaterial color="#3a4f7a" roughness={0.4} />
+          </mesh>
+          <mesh position={[-0.055, 0.185, 0.03]}>
+            <sphereGeometry args={[0.026, 14, 12]} />
+            <meshStandardMaterial color="#3a4f7a" roughness={0.4} />
+          </mesh>
+          <mesh position={[0, 0.115, -0.075]} rotation={[-0.5, 0, 0]}>
+            <coneGeometry args={[0.032, 0.1, 16]} />
+            <meshStandardMaterial color="#b9bcbb" roughness={0.45} />
           </mesh>
         </group>
       </group>
