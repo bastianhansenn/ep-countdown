@@ -1,7 +1,7 @@
 import puppeteer from 'puppeteer'
 const SP='C:/Users/basti/AppData/Local/Temp/claude/C--Users-basti-OneDrive-Documents-GitHub-ProReach/84e84cf5-8c45-435b-b3ec-b99ae747f174/scratchpad/'
 const [,,url,out,w,h]=process.argv
-const browser=await puppeteer.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox']})
+const browser=await puppeteer.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox','--disable-gpu']})
 const page=await browser.newPage()
 await page.setViewport({width:Number(w),height:Number(h)})
 await page.goto(url,{waitUntil:'networkidle0',timeout:60000})
