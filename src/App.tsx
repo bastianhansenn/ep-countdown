@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Background from './components/Background'
 import Scene from './components/Scene'
+import SceneBoundary from './components/SceneBoundary'
 import Countdown from './components/Countdown'
 import Logo from './components/Logo'
 import AudioPlayer from './components/AudioPlayer'
@@ -39,7 +40,9 @@ export default function App() {
       <Background />
 
       <div className="absolute inset-0 z-10">
-        <Scene onReady={() => setSceneReady(true)} />
+        <SceneBoundary onFallback={() => setSceneReady(true)}>
+          <Scene onReady={() => setSceneReady(true)} />
+        </SceneBoundary>
       </div>
 
       <div
