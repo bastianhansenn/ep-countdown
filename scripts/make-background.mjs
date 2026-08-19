@@ -228,8 +228,42 @@ for (let y = 0; y < H; y++) {
   }
 }
 
+// ---- Evening grade ----
+// One knob, 0 = the untouched daylight photo, 1 = full evening. The exposure
+// is scaled by a luminance-preserving ratio (a darker exposure with a slight
+// S-curve), most of the photo's own colour is kept, and the white balance
+// shifts cool; the sky and upper frame lose a little extra light, as they do
+// at dusk. src/components/Scene.tsx carries the same number for the 3D lights
+// so the vase always matches the street.
+const EVENING = Number(process.argv[2] ?? 0)
+if (EVENING > 0) {
+  const E = Math.max(0, Math.min(1, EVENING))
+  const clamp = (v) => Math.max(0, Math.min(255, v))
+  const mix = (a, b, t) => a + (b - a) * t
+  for (let y = 0; y < H; y++) {
+    // upper frame (sky, roofs) darkens a touch faster than the street
+    const up = 1 - Math.min(1, y / (H * 0.55))
+    const extra = 1 - 0.14 * E * up
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4
+      const r = out[i]
+      const g = out[i + 1]
+      const b = out[i + 2]
+      const L = 0.2126 * r + 0.7152 * g + 0.0722 * b
+      const t = L / 255
+      const darkT = Math.pow(t, 1 + 0.2 * E) * (1 - 0.42 * E) * extra
+      const scaleL = darkT / Math.max(t, 0.004)
+      const gray = darkT * 255
+      // keep 88% of the photo's own colour, then shift the white balance cool
+      out[i] = clamp(Math.round(mix(gray, r * scaleL, 0.88) * (1 - 0.05 * E)))
+      out[i + 1] = clamp(Math.round(mix(gray, g * scaleL, 0.88) * (1 - 0.015 * E)))
+      out[i + 2] = clamp(Math.round(mix(gray, b * scaleL, 0.88) * (1 + 0.07 * E)))
+    }
+  }
+}
+
 const meta = await sharp(out, { raw: { width: W, height: H, channels: 4 } })
   .flatten()
   .jpeg({ quality: 88, chromaSubsampling: '4:4:4' })
   .toFile('public/background.jpg')
-console.log(`wrote public/background.jpg (${meta.width}x${meta.height}, ${Math.round(meta.size / 1024)} KB)`)
+console.log(`wrote public/background.jpg (${meta.width}x${meta.height}, ${Math.round(meta.size / 1024)} KB) evening=${EVENING}`)

@@ -23,6 +23,33 @@ const VASE_MODEL_H = 3.02
 // every filled pixel. Verified by scripts/check-coverage.mjs.
 const COVER_SCALE = 1.07
 
+// How far into the evening the scene is: 0 = the daylight photo, 1 = full
+// evening. scripts/make-background.mjs grades the backdrop with the SAME
+// number (node scripts/make-background.mjs <EVENING>), so the vase's light and
+// the street always match. Everything below interpolates from it.
+const EVENING = 0.8
+const mix = (a: number, b: number, t: number) => a + (b - a) * t
+const mixHex = (a: string, b: string, t: number) => {
+  const p = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+  const [ar, ag, ab] = p(a)
+  const [br, bg, bb] = p(b)
+  const h = (v: number) => Math.round(v).toString(16).padStart(2, '0')
+  return `#${h(mix(ar, br, t))}${h(mix(ag, bg, t))}${h(mix(ab, bb, t))}`
+}
+const LIGHT = {
+  ambient: mix(0.85, 0.3, EVENING),
+  ambientColor: mixHex('#dfe3e6', '#93a3bd', EVENING),
+  key: mix(0.55, 0.14, EVENING),
+  keyColor: mixHex('#f0f2f4', '#aebbd2', EVENING),
+  rimBlue: mix(0.05, 0.3, EVENING),
+  rimViolet: mix(0.03, 0.16, EVENING),
+  beam: mix(0.5, 0.85, EVENING),
+  env: mix(1.6, 0.5, EVENING),
+  envFill: mix(1.1, 0.35, EVENING),
+  envWarm: mix(0.7, 0.22, EVENING),
+  envRoom: mixHex('#15161a', '#05060a', EVENING),
+}
+
 // Shared object-cover math: the photo plane size at BACKDROP_Z.
 function useCoverPlane() {
   const aspect = useThree((s) => s.viewport.aspect)
@@ -77,7 +104,7 @@ function MuseumDisplay() {
         position={[1.5, 7.5, 3]}
         target={spotTarget}
         color="#d8e4ff"
-        intensity={0.5}
+        intensity={LIGHT.beam}
         angle={0.42}
         penumbra={0.9}
         decay={0}
@@ -100,11 +127,11 @@ export default function Scene({ onReady }: { onReady: () => void }) {
           baked depth-of-field in the image already carries the depth cue. */}
       {/* Lit to match the photo: an overcast, slightly cool sky, soft and
           low-contrast. A bright key would blow the glaze into plastic blue. */}
-      <ambientLight intensity={0.85} color="#dfe3e6" />
-      <directionalLight position={[4, 6, 5]} intensity={0.55} color="#f0f2f4" />
+      <ambientLight intensity={LIGHT.ambient} color={LIGHT.ambientColor} />
+      <directionalLight position={[4, 6, 5]} intensity={LIGHT.key} color={LIGHT.keyColor} />
       {/* decay 0 = no physical falloff; these are distant rim accents. */}
-      <pointLight position={[-5, 2, -3]} color="#3355ff" intensity={0.05} decay={0} />
-      <pointLight position={[4, -1, -4]} color="#7744cc" intensity={0.03} decay={0} />
+      <pointLight position={[-5, 2, -3]} color="#3355ff" intensity={LIGHT.rimBlue} decay={0} />
+      <pointLight position={[4, -1, -4]} color="#7744cc" intensity={LIGHT.rimViolet} decay={0} />
 
       {/* Separate boundaries: the vase must not wait for the backdrop's
           bigger download, and vice versa. Preload links in index.html warm
@@ -122,24 +149,24 @@ export default function Scene({ onReady }: { onReady: () => void }) {
         <Environment resolution={256} frames={1}>
           <mesh scale={100}>
             <sphereGeometry args={[1, 16, 16]} />
-            <meshBasicMaterial color="#15161a" side={THREE.BackSide} />
+            <meshBasicMaterial color={LIGHT.envRoom} side={THREE.BackSide} />
           </mesh>
           <Lightformer
-            intensity={1.6}
+            intensity={LIGHT.env}
             color="#eef1f4"
             position={[5, 5, 5]}
             scale={[6, 6, 1]}
             target={[0, 0, 0]}
           />
           <Lightformer
-            intensity={1.1}
+            intensity={LIGHT.envFill}
             color="#c9cdd3"
             position={[-6, 2, -4]}
             scale={[8, 4, 1]}
             target={[0, 0, 0]}
           />
           <Lightformer
-            intensity={0.7}
+            intensity={LIGHT.envWarm}
             color="#bcbfc4"
             position={[6, -2, -5]}
             scale={[6, 3, 1]}
