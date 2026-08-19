@@ -5,6 +5,25 @@ body {
   background-color: #030308;
 }
 
+/* The object-cover rect for the 3600x2437 photo, in pure CSS so it uses the
+   same viewport units as the rest of the layout (JS innerHeight disagrees
+   with dvh on phones when the address bar collapses). Both the photo and the
+   lid window live inside this wrapper, so they can never drift apart. */
+.stage-cover {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: max(100vw, 147.7226vh);
+  height: max(100vh, 67.6944vw);
+}
+@supports (height: 100dvh) {
+  .stage-cover {
+    width: max(100dvw, 147.7226dvh);
+    height: max(100dvh, 67.6944dvw);
+  }
+}
+
 @keyframes spin-y {
   from {
     transform: rotateY(0deg);
@@ -22,20 +41,6 @@ body {
   .animate-spin-y {
     animation: none;
   }
-}
-
-/* Soft pulsing glow in the gap under the lifted lid. */
-@keyframes seam-glow {
-  0% {
-    opacity: 0.25;
-  }
-  100% {
-    opacity: 0.85;
-  }
-}
-
-.animate-seam-glow {
-  animation: seam-glow 2.9s ease-in-out infinite alternate;
 }
 
 /* Dramatic left-to-right countdown reveal: each unit sweeps in from blur. */
